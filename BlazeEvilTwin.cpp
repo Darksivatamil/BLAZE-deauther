@@ -120,19 +120,21 @@ namespace BlazeEvilTwin {
             // password was correct!
             capturedPw = pendingPw;
             validating = false;
-            WiFi.disconnect(true);
+            // disconnect STA only - NEVER WiFi.disconnect(true): that disables
+            // the STA interface and re-initialises mode mid-twin (portal blips)
+            WiFi.disconnect(false, true);
             stop();
             return;
         }
         if (st == WL_CONNECT_FAILED || st == WL_NO_SSID_AVAIL || st == WL_WRONG_PASSWORD) {
             // wrong password - stay in twin
             validating = false;
-            WiFi.disconnect(true);
+            WiFi.disconnect(false, true);
         }
         // still trying - wait up to 15s
         if (millis() - validateAt > 15000) {
             validating = false;
-            WiFi.disconnect(true);
+            WiFi.disconnect(false, true);
         }
     }
 

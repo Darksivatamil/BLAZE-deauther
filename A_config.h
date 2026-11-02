@@ -125,9 +125,11 @@
 
   #define FLIP_DIPLAY true
 
-// ===== BUTTONS ===== //  D5=UP  D6=DOWN  D7=A  (D4=MODE handled in BLAZE section)
-  #define BUTTON_UP 14   // D5
-  #define BUTTON_DOWN 12 // D6
+// ===== BUTTONS ===== //  SWAPPED per user request: UP<->DOWN pin connections
+//   (physical UP key does DOWN action, physical DOWN key does UP action)
+//   D6=UP  D5=DOWN  D7=A  (D4=MODE handled in BLAZE section)
+  #define BUTTON_UP 12   // D6 (was D5/GPIO14 - pins swapped)
+  #define BUTTON_DOWN 14 // D5 (was D6/GPIO12 - pins swapped)
   #define BUTTON_A 13    // D7
 
 // ===== LED ===== //

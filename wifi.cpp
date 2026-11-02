@@ -223,10 +223,22 @@ namespace wifi {
             copyWebFiles(false);
         }
 
+        // ===== BLAZE deauth hardening (root-cause fixes) =====
+        // 1) Radio must never sleep: modem sleep makes wifi_send_pkt_freedom()
+        //    fail intermittently and the deauth frame never reaches the air.
+        // 2) The SDK must never run background station scans/reconnects on its
+        //    own (stale credentials from older flashed sketches): every scan
+        //    hops the channel away from the attack target mid-frame.
+        WiFi.persistent(false);                // never persist station credentials
+        wifi_station_set_auto_connect(0);      // kill auto-reconnect / background scans
+        wifi_set_sleep_type(NONE_SLEEP_T);     // modem sleep OFF - radio always awake
+        WiFi.setSleepMode(WIFI_NONE_SLEEP);    // same, via Arduino API (double safety)
+
         // Set mode
         mode = wifi_mode_t::off;
         WiFi.mode(WIFI_OFF);
         wifi_set_opmode(STATION_MODE);
+        wifi_station_disconnect();             // clean, not-associated station state
 
         // Set mac address
         wifi_set_macaddr(STATION_IF, (uint8_t*)settings::getWifiSettings().mac_st);

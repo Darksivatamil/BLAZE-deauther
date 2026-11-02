@@ -31,6 +31,51 @@ extern void setWifiChannel(uint8_t ch, bool force);
 extern bool writeFile(String path, String& buf);
 extern int8_t free80211_send(uint8_t* buffer, uint16_t len);
 
+/* ===== Rate-limited burst scheduler (token bucket) =====
+   Refills at `rate` tokens/second, holds up to `cap` tokens of burst.
+   - fixes the old "1000 / maxPkts" integer division (0 ms interval ->
+     uncontrolled packet flood -> SDK queue overflow -> watchdog resets)
+   - gives attacks a burst+gap duty cycle: short bursts keep the SDK TX
+     queue drained, the gap lets it flush -> higher *delivered* rate */
+struct RateLimiter {
+    uint32_t acc  = 0;  // sub-token accumulator (1/1000 of a packet)
+    uint32_t last = 0;  // last refill timestamp (0 = not initialized yet)
+    uint16_t tok  = 0;  // available packets right now
+    uint16_t cap  = 4;  // burst capacity (max tokens)
+
+    void reset(uint16_t rate, uint32_t now) {
+        if (rate < 1) rate = 1;
+        cap = (uint16_t)(rate / 8 + 4); // burst ~= 125 ms worth of packets
+        if (cap > 64) cap = 64;
+        if (cap < 4)  cap = 4;
+        tok  = cap;
+        acc  = 0;
+        last = now;
+    }
+
+    bool allow(uint16_t rate, uint32_t now) {
+        if (rate < 1) return false;
+        if (last == 0) reset(rate, now); // first use
+
+        uint32_t dt = now - last;        // unsigned math: millis wrap-safe
+        if (dt > 10000UL) dt = 10000UL;  // clamp long pauses (no overflow, no burst spikes)
+        last = now;
+
+        acc += dt * (uint32_t)rate;
+        while ((acc >= 1000UL) && (tok < cap)) {
+            tok++;
+            acc -= 1000UL;
+        }
+        if (tok >= cap) acc = 0; // bucket full: drop surplus
+
+        if (tok == 0) return false;
+        tok--;
+        return true;
+    }
+
+    void clear()  { last = 0; }
+};
+
 class Attack {
     public:
         Attack();
@@ -92,6 +137,11 @@ class Attack {
         AttackType beacon;
         AttackType probe;
         bool deauthAll = false;
+
+        // burst schedulers - one per attack type (see RateLimiter above)
+        RateLimiter deauthRate;
+        RateLimiter beaconRate;
+        RateLimiter probeRate;
 
         uint32_t deauthPkts = 0;
         uint32_t beaconPkts = 0;

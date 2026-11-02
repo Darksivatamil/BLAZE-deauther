@@ -73,9 +73,9 @@ void DisplayUI::setup() {
     // compiled button pins (proves what the firmware listens on)
     prnt("BLAZE BTN PINS: UP=");
     prnt((int)BUTTON_UP);
-    prnt(" (D5)  DOWN=");
+    prnt(" (D6)  DOWN=");
     prnt((int)BUTTON_DOWN);
-    prnt(" (D6)  A=");
+    prnt(" (D5)  A=");
     prnt((int)BUTTON_A);
     prntln(" (D7)");
 
@@ -529,7 +529,7 @@ void DisplayUI::update(bool force) {
                 lastRaw[0] = raw[0];
                 lastRaw[1] = raw[1];
                 lastRaw[2] = raw[2];
-                Serial.printf("RAW BTN: UP(D5)=%d DOWN(D6)=%d A(D7)=%d\n", raw[0], raw[1], raw[2]);
+                Serial.printf("RAW BTN: UP(D6)=%d DOWN(D5)=%d A(D7)=%d\n", raw[0], raw[1], raw[2]);
             }
         }
     }
