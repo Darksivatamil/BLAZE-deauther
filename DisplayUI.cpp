@@ -7,6 +7,7 @@
 #include "BlazeFx.h"
 #include "BlazeMood.h"
 #include "BlazeEvilTwin.h"
+#include "BlazeRecon.h"
 
 // ===== adjustable ===== //
 void DisplayUI::configInit() {
@@ -138,6 +139,26 @@ void DisplayUI::setup() {
         addMenuNode(&scanMenu, D_SCAN_ST, [this]() { // SCAN ST
             scan.start(SCAN_MODE_STATIONS, 30000, SCAN_MODE_OFF, 0, true, wifi_channel);
             mode = DISPLAY_MODE::LOADSCAN;
+        });
+        addMenuNode(&scanMenu, [this]() { // PROBE LOG (plan 4.5)
+            return leftRight("PROBES", (String)BlazeRecon::probeCount(), maxLen - 1);
+        }, [this]() {
+            // live log: sniff (channel hopping) if nothing is sniffing yet
+            if (!scan.isSniffing()) {
+                scan.start(SCAN_MODE_SNIFFER, 0, SCAN_MODE_OFF, 0, true, wifi_channel);
+                probeLogSniff = true;
+            } else {
+                probeLogSniff = false;
+            }
+            probeScroll = 0;
+            mode        = DISPLAY_MODE::PROBELOG;
+            restoreMenuFont();
+        });
+        addMenuNode(&scanMenu, [this]() { // VULNERABILITY SCORE (plan 4.6)
+            return leftRight("VULN", String(BlazeRecon::riskScore()), maxLen - 1);
+        }, [this]() {
+            mode = DISPLAY_MODE::VULN;
+            restoreMenuFont();
         });
     });
 
@@ -432,7 +453,7 @@ void DisplayUI::setup() {
             deauthSelected = !deauthSelected;
 
             if (attack.isRunning()) {
-                attack.start(beaconSelected, deauthSelected, false, probeSelected, true,
+                attack.start(beaconSelected, deauthSelected, false, probeSelected, csaSelected, true,
                              settings::getAttackSettings().timeout * 1000);
             }
         });
@@ -445,7 +466,7 @@ void DisplayUI::setup() {
             beaconSelected = !beaconSelected;
 
             if (attack.isRunning()) {
-                attack.start(beaconSelected, deauthSelected, false, probeSelected, true,
+                attack.start(beaconSelected, deauthSelected, false, probeSelected, csaSelected, true,
                              settings::getAttackSettings().timeout * 1000);
             }
         });
@@ -458,7 +479,17 @@ void DisplayUI::setup() {
             probeSelected = !probeSelected;
 
             if (attack.isRunning()) {
-                attack.start(beaconSelected, deauthSelected, false, probeSelected, true,
+                attack.start(beaconSelected, deauthSelected, false, probeSelected, csaSelected, true,
+                             settings::getAttackSettings().timeout * 1000);
+            }
+        });
+        addMenuNode(&attackMenu, [this]() { // *CSA 0/0 - channel switch announcement
+            return leftRight(b2a(csaSelected) + "CSA", (String)scan.countSelected(), maxLen - 1);
+        }, [this]() { // csa toggle
+            csaSelected = !csaSelected;
+
+            if (attack.isRunning()) {
+                attack.start(beaconSelected, deauthSelected, false, probeSelected, csaSelected, true,
                              settings::getAttackSettings().timeout * 1000);
             }
         });
@@ -467,15 +498,74 @@ void DisplayUI::setup() {
                              attack.getPacketRate() > 0 ? (String)attack.getPacketRate() : String(), maxLen - 1);
         }, [this]() {
             if (attack.isRunning()) attack.stop();
-            else attack.start(beaconSelected, deauthSelected, false, probeSelected, true,
+            else attack.start(beaconSelected, deauthSelected, false, probeSelected, csaSelected, true,
                               settings::getAttackSettings().timeout * 1000);
         });
         addMenuNode(&attackMenu, [this]() { // KILL flood: continuous deauth-all (no timeout)
-            if (attack.isRunning()) return leftRight("KILL", (String)attack.getPacketRate(), maxLen - 1);
-            else return leftRight("KILL", "flood", maxLen - 1);
+            if (attack.isRunning() && attack.isKill()) {
+                // 4.7: show elapsed mm:ss + delivered pps so a KILL run is measurable
+                uint32_t s = attack.getElapsed() / 1000;
+                String elapsed = String(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + String(s % 60);
+                return leftRight("KILL " + elapsed, (String)attack.getPacketRate(), maxLen - 1);
+            }
+            return leftRight("KILL", "flood", maxLen - 1);
         }, [this]() {
             if (attack.isRunning()) attack.stop();
-            else attack.start(false, true, true, false, true, 0); // deauth + deauthAll, continuous
+            else attack.start(false, true, true, false, false, true, 0); // deauth + deauthAll, continuous
+        });
+        addMenuNode(&attackMenu, [this]() { // KICK & LURE (plan 4.3)
+            String right;
+            if (kickLureActive) {
+                right = String(BlazeEvilTwin::attempts());
+                if (BlazeEvilTwin::captured().length()) right += ":PW";
+                else right += ":...";
+            } else {
+                right = "twin";
+            }
+            return leftRight("KICK", right, maxLen - 1);
+        }, [this]() { // toggle kick-and-lure
+            if (kickLureActive) {
+                kickLureActive = false;
+                BlazeEvilTwin::stop();
+                if (attack.isRunning()) attack.stop();
+                return;
+            }
+
+            // start: evil twin portal on the first selected AP + timed deauth
+            // kick that forces clients off the real AP onto the twin
+            int t = -1;
+            for (int i = 0; i < accesspoints.count(); i++) {
+                if (accesspoints.getSelected(i)) { t = i; break; }
+            }
+            if (t < 0 && accesspoints.count() > 0) t = 0;
+            if (t < 0) return; // no target AP
+
+            if (!BlazeEvilTwin::start(t)) return;
+            kickLureActive = true;
+            attack.start(false, true, false, false, false, true,
+                         settings::getAttackSettings().timeout * 1000);
+        });
+        addMenuNode(&attackMenu, [this]() { // CAPTURE (plan 4.4): EAPOL handshake capture
+            String right;
+            if (BlazeRecon::capturing()) {
+                right = (BlazeRecon::capturePhase() == 1) ? String("kick")
+                                                          : String("REC ") + String(BlazeRecon::eapolFrames());
+            } else {
+                right = String(BlazeRecon::eapolTotal());
+            }
+            return leftRight("CAP", right, maxLen - 1);
+        }, [this]() { // toggle capture on the first selected AP
+            if (BlazeRecon::capturing()) {
+                BlazeRecon::stopCapture();
+                return;
+            }
+            int t = -1;
+            for (int i = 0; i < accesspoints.count(); i++) {
+                if (accesspoints.getSelected(i)) { t = i; break; }
+            }
+            if (t < 0 && accesspoints.count() > 0) t = 0;
+            if (t < 0) return; // no target AP
+            BlazeRecon::startCapture(t);
         });
     });
 
@@ -620,6 +710,8 @@ void DisplayUI::setupButtons() {
             scan.setChannel(wifi_channel + 1);
         } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
             setTime(clockHour, clockMinute + 1, clockSecond);
+        } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list up
+            if (probeScroll > 0) probeScroll--;
         }
     });
 
@@ -638,6 +730,8 @@ void DisplayUI::setupButtons() {
             scan.setChannel(wifi_channel + 1);
         } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
             setTime(clockHour, clockMinute + 10, clockSecond);
+        } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list up
+            if (probeScroll > 0) probeScroll--;
         }
     }, buttonDelay);
 
@@ -666,6 +760,9 @@ void DisplayUI::setupButtons() {
             scan.setChannel(wifi_channel - 1);
         } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
             setTime(clockHour, clockMinute - 1, clockSecond);
+        } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list down
+            int maxScroll = BlazeRecon::probeCount() - 1;
+            if (probeScroll < maxScroll) probeScroll++;
         }
     });
 
@@ -684,6 +781,9 @@ void DisplayUI::setupButtons() {
             scan.setChannel(wifi_channel - 1);
         } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
             setTime(clockHour, clockMinute - 10, clockSecond);
+        } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list down
+            int maxScroll = BlazeRecon::probeCount() - 1;
+            if (probeScroll < maxScroll) probeScroll++;
         }
     }, buttonDelay);
 
@@ -772,6 +872,21 @@ void DisplayUI::setupButtons() {
                 buttonTime = currentTime;
                 break;
 
+            // recon screens: SELECT = back to menu
+            case DISPLAY_MODE::PROBELOG:
+                if (probeLogSniff && scan.isSniffing()) scan.stop();
+                probeLogSniff = false;
+                mode          = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::VULN:
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
             // BLAZE screens: click = next mode (FACE -> MENU -> FACE ...)
             case DISPLAY_MODE::LOADING:
             case DISPLAY_MODE::BLAZE_FACE:
@@ -826,6 +941,18 @@ void DisplayUI::setupButtons() {
                 restoreMenuFont();
                 break;
 
+            case DISPLAY_MODE::PROBELOG:
+                if (probeLogSniff && scan.isSniffing()) scan.stop();
+                probeLogSniff = false;
+                mode          = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::VULN:
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
                 // BLAZE screens: B = back to menu
                 case DISPLAY_MODE::LOADING:
                 case DISPLAY_MODE::BLAZE_FACE:
@@ -855,6 +982,10 @@ void DisplayUI::cycleMode() {
 
         default: // MENU, CLOCK, PACKETMONITOR, ... -> back to BLAZE face loop
             if (mode == DISPLAY_MODE::PACKETMONITOR || mode == DISPLAY_MODE::LOADSCAN) scan.stop();
+            if (mode == DISPLAY_MODE::PROBELOG) {
+                if (probeLogSniff && scan.isSniffing()) scan.stop();
+                probeLogSniff = false;
+            }
             mode = DISPLAY_MODE::BLAZE_FACE;
             BlazeFace::startFace();
             break;
@@ -1057,6 +1188,12 @@ void DisplayUI::draw(bool force) {
             case DISPLAY_MODE::EVILTWIN:
                 drawEvilTwin();
                 break;
+            case DISPLAY_MODE::PROBELOG:
+                drawProbeLog();
+                break;
+            case DISPLAY_MODE::VULN:
+                drawVuln();
+                break;
             case DISPLAY_MODE::PANIC:
                 drawPanic();
                 break;
@@ -1240,6 +1377,54 @@ void DisplayUI::drawEvilTwin() {
 
     drawString(3, center("open network", maxLen));
     drawString(4, center("SELECT = STOP", maxLen));
+}
+
+// ===== BLAZE: probe-request log screen (plan 4.5) ===== //
+void DisplayUI::drawProbeLog() {
+    restoreMenuFont();
+
+    int n = BlazeRecon::probeCount();
+    drawString(0, "PROBES " + String(n) + " tot " + String(BlazeRecon::probeTotal()));
+
+    if (n == 0) {
+        drawString(2, center("waiting for probes", maxLen));
+        drawString(4, center("B = back", maxLen));
+        return;
+    }
+
+    // clamp scroll: 3 visible rows (1..3), header row 0, footer row 4
+    int maxScroll = n - 3;
+    if (maxScroll < 0) maxScroll = 0;
+    if (probeScroll > maxScroll) probeScroll = maxScroll;
+    if (probeScroll < 0) probeScroll = 0;
+
+    for (int r = 0; r < 3; r++) {
+        int i = probeScroll + r;
+        if (i >= n) break;
+        drawString(r + 1, BlazeRecon::probeLine(i));
+    }
+
+    drawString(4, center("UP/DN B=back", maxLen));
+}
+
+// ===== BLAZE: vulnerability score screen (plan 4.6) ===== //
+void DisplayUI::drawVuln() {
+    restoreMenuFont();
+
+    drawString(0, "VULN SCORE " + String(BlazeRecon::riskScore()));
+    drawString(1, center(String(BlazeRecon::riskLevel()), maxLen));
+
+    int w = BlazeRecon::worstAp();
+    if (w >= 0) {
+        String ssid = accesspoints.getSSID(w);
+        if (ssid.length() > 16) ssid = ssid.substring(0, 16);
+        drawString(2, center("worst:", maxLen));
+        drawString(3, center(ssid, maxLen));
+    } else {
+        drawString(2, center("no APs scanned", maxLen));
+    }
+
+    drawString(4, center("B = back", maxLen));
 }
 
 void DisplayUI::drawButtonTest() {

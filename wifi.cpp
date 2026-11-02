@@ -23,6 +23,7 @@ extern "C" {
 #include "BlazeTracker.h"
 #include "BlazeMood.h"
 #include "BlazeEvilTwin.h"
+#include "BlazeRecon.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
 
 extern DisplayUI displayUI;
@@ -473,6 +474,15 @@ namespace wifi {
                 }
             }
             server.send(200, str(W_JSON), BlazeTracker::toJson());
+        });
+
+        // ===== BLAZE recon report (plan 4.6) =====
+        server.on("/report.json", HTTP_GET, []() {
+            server.send(200, str(W_JSON), BlazeRecon::reportJson());
+        });
+
+        server.on("/report.csv", HTTP_GET, []() {
+            server.send(200, "text/csv", BlazeRecon::reportCsv());
         });
 
         // called when the url is not defined here

@@ -81,7 +81,7 @@ class Attack {
         Attack();
 
         void start();
-        void start(bool beacon, bool deauth, bool deauthAll, bool probe, bool output, uint32_t timeout);
+        void start(bool beacon, bool deauth, bool deauthAll, bool probe, bool csa, bool output, uint32_t timeout);
         void stop();
         void update();
 
@@ -105,6 +105,10 @@ class Attack {
 
         bool isRunning();
 
+        // KILL-mode helpers (plan 4.7): elapsed time + "is this a KILL run?"
+        uint32_t getElapsed(); // ms since the current attack started
+        bool isKill();         // true while a deauthall (KILL) run is active
+
         uint32_t getDeauthPkts();
         uint32_t getBeaconPkts();
         uint32_t getProbePkts();
@@ -119,6 +123,10 @@ class Attack {
         void deauthAllUpdate();
         void beaconUpdate();
         void probeUpdate();
+        void csaUpdate();
+
+        // Channel Switch Announcement beacon (plan 4.2)
+        bool sendCSA(uint8_t* apMac, const char* ssid, uint8_t ch, bool wpa2, uint8_t newCh);
 
         void updateCounter();
 
@@ -136,16 +144,19 @@ class Attack {
         AttackType deauth;
         AttackType beacon;
         AttackType probe;
+        AttackType csa;       // CSA beacon attack (plan 4.2)
         bool deauthAll = false;
 
         // burst schedulers - one per attack type (see RateLimiter above)
         RateLimiter deauthRate;
         RateLimiter beaconRate;
         RateLimiter probeRate;
+        RateLimiter csaRate;
 
         uint32_t deauthPkts = 0;
         uint32_t beaconPkts = 0;
         uint32_t probePkts  = 0;
+        uint32_t csaPkts    = 0;
 
         uint32_t tmpPacketRate = 0;
         uint32_t packetRate    = 0;
@@ -251,4 +262,9 @@ class Attack {
             /* 103 - 106 */ 0x00, 0x0f,                 0xac,                 0x02,
             /* 107 - 108 */ 0x00, 0x00
         };
+
+        // Channel Switch Announcement beacon (plan 4.2)
+        // header(24) + timestamp/interval/caps(12) + SSID IE(<=34) + rates(10)
+        // + DS(3) + RSN(26) + CSA IE(5) = max 114 bytes
+        uint8_t csaPacket[128];
 };

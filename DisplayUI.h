@@ -86,6 +86,8 @@ enum class DISPLAY_MODE { OFF,
                           BLAZE_FACE,
                           TRACKER,
                           EVILTWIN,
+                          PROBELOG,
+                          VULN,
                           PANIC };
 
 class DisplayUI {
@@ -165,6 +167,14 @@ class DisplayUI {
         bool beaconSelected = false;
         bool deauthSelected = false;
         bool probeSelected  = false;
+        bool csaSelected    = false; // CSA beacon attack (plan 4.2)
+
+        // Kick-and-Lure (plan 4.3): twin portal + deauth kick running together
+        bool kickLureActive = false;
+
+        // probe log screen (plan 4.5): scroll position + "we started the sniffer"
+        int  probeScroll   = 0;
+        bool probeLogSniff = false;
 
         // menus
         Menu* currentMenu;
@@ -214,6 +224,10 @@ class DisplayUI {
         // BLAZE twin
         void drawEvilTwin();
         void startTwin(int idx);
+
+        // BLAZE recon screens (plans 4.5 / 4.6)
+        void drawProbeLog(); // live probe-request list
+        void drawVuln();     // vulnerability score
 
         // BLAZE panic / kill switch
         void checkPanic();   // global UP+DOWN hold = emergency stop (any screen)

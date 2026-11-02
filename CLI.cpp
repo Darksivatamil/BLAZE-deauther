@@ -5,6 +5,7 @@
 #include <LittleFS.h>
 #include "settings.h"
 #include "wifi.h"
+#include "BlazeRecon.h"
 
 /*
    Shitty code used less resources so I will keep this clusterfuck as it is,
@@ -262,6 +263,7 @@ void CLI::runCommand(String input) {
         prntln(CLI_HELP_REMOVE_B);
         prntln(CLI_HELP_ATTACK);
         prntln(CLI_HELP_ATTACK_STATUS);
+        prntln(CLI_HELP_REPORT);
         prntln(CLI_HELP_STOP);
         prntln(CLI_HELP_SYSINFO);
         prntln(CLI_HELP_CLEAR);
@@ -657,6 +659,7 @@ void CLI::runCommand(String input) {
         bool deauth      = false;
         bool deauthAll   = false;
         bool probe       = false;
+        bool csa         = false;
         bool output      = true;
         uint32_t timeout = settings::getAttackSettings().timeout * 1000;
 
@@ -665,6 +668,7 @@ void CLI::runCommand(String input) {
             else if (eqlsCMD(i, CLI_DEAUTH)) deauth = true;
             else if (eqlsCMD(i, CLI_DEAUTHALL)) deauthAll = true;
             else if (eqlsCMD(i, CLI_PROBE)) probe = true;
+            else if (eqlsCMD(i, CLI_CSA)) csa = true;
             else if (eqlsCMD(i, CLI_NOOUTPUT)) output = false;
             else if (eqlsCMD(i, CLI_TIMEOUT)) {
                 timeout = getTime(list->get(i + 1));
@@ -673,7 +677,7 @@ void CLI::runCommand(String input) {
             else parameterError(list->get(i));
         }
 
-        attack.start(beacon, deauth, deauthAll, probe, output, timeout);
+        attack.start(beacon, deauth, deauthAll, probe, csa, output, timeout);
     }
 
     // ===== GET/SET ===== //
@@ -829,6 +833,15 @@ void CLI::runCommand(String input) {
             attack.stop();
             this->stop();
         }
+    }
+
+    // ===== VULN REPORT (plan 4.6) =====
+    // report [json/csv]
+    else if (eqlsCMD(0, CLI_REPORT)) {
+        bool csv = false;
+        if (list->size() > 1) csv = list->get(1).equalsIgnoreCase("csv");
+        if (csv) prntln(BlazeRecon::reportCsv());
+        else prntln(BlazeRecon::reportJson());
     }
 
     // ===== SYSTEM ===== //

