@@ -1,0 +1,46 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // TWIN</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/twin.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>EVIL TWIN</h1>
+      <p class=dim>Clone a scanned AP as an open hotspot with a captive login portal. Authorized testing only.</p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>TARGET</h2>
+      <p><label>Target SSID</label><select id=twinTarget></select></p>
+      <p>
+        <button id=twinStart onclick="twinToggle()">START TWIN</button>
+        <button onclick="twinReload()" class=cyan>RELOAD APS</button>
+      </p>
+    </div>
+    <div class="col-6 card">
+      <h2>STATUS</h2>
+      <p class="bold" id=twinStatus>IDLE</p>
+      <p id=twinCapture class=green></p>
+      <p class=dim>Select a scanned AP, then start the twin. Victims see a login portal.</p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=scan.html>Scan</a> | <a href=tracker.html>Tracker</a> | <a href=index.html>Dashboard</a>
+</footer>
+

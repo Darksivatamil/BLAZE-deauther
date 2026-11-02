@@ -1,0 +1,38 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // ACCESS</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/blaze.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div class=loginBox>
+<h1 class="brand glitch" data-text="BLAZE">BLAZE</h1>
+<p class=loginSub>TEAM DARK // restricted access terminal</p>
+<form id=loginForm>
+<label for=user>USERNAME</label>
+<input type=text id=user autocomplete=username placeholder="username" required>
+<label for=pass>PASSWORD</label>
+<input type=password id=pass autocomplete=current-password placeholder="password" required>
+<p class=loginMsg id=loginMsg></p>
+<button type=submit>ACCESS</button>
+</form>
+<p class=loginSub>v2.7 // unauthorized access is logged</p>
+</div>
+<script>
+(function () {
+	var form = document.getElementById("loginForm");
+	var msg = document.getElementById("loginMsg");
+
+	form.onsubmit = function (e) {
+		e.preventDefault();
+		var u = document.getElementById("user").value;
+		var p = document.getElementById("pass").value;
+		if (blazeLogin(u, p)) return;
+		msg.textContent = "ACCESS DENIED";
+		form.reset();
+	};
+})();
+</script>

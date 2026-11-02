@@ -1,0 +1,86 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // SCAN</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/scan.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>SCAN</h1>
+      <p class=dim>Scan nearby access points and stations. Select targets, then open ATTACK or TRACK.</p>
+      <button id=scanZero onclick="scan(0)">SCAN APs</button>
+      <button id=scanOne onclick="scan(1)">SCAN STATIONS</button>
+      <button id=RButton onclick="load()" class="right cyan">RELOAD</button>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>OPTIONS</h2>
+      <p><label for=ch>Channel</label>
+        <select id=ch name=ch>
+          <option value=all>All</option>
+          <option value=1>1</option><option value=2>2</option><option value=3>3</option>
+          <option value=4>4</option><option value=5>5</option><option value=6>6</option>
+          <option value=7>7</option><option value=8>8</option><option value=9>9</option>
+          <option value=10>10</option><option value=11>11</option><option value=12>12</option>
+          <option value=13>13</option><option value=14>14</option>
+        </select>
+      </p>
+      <p><label>Station Scan Time</label>
+        <input type=number value=15 id=scanTime> s</p>
+    </div>
+    <div class="col-6 card">
+      <h2>SELECTION</h2>
+      <p class=dim>Selected targets feed ATTACK + TRACK + TWIN.</p>
+      <p>
+        <button onclick="selectAll(0,true)">ALL APs</button>
+        <button onclick="selectAll(0,false)" class=red>CLR APs</button>
+      </p>
+      <p>
+        <button onclick="selectAll(1,true)">ALL STATIONS</button>
+        <button onclick="selectAll(1,false)" class=red>CLR STATIONS</button>
+      </p>
+      <p>
+        <button onclick="selectAll(2,true)">ALL NAMES</button>
+        <button onclick="selectAll(2,false)" class=red>CLR NAMES</button>
+      </p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>ACCESS POINTS <span class=dim id=apNum>0</span></h2>
+      <div id=apTable><p class=dim>Run SCAN APs to populate.</p></div>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>STATIONS <span class=dim id=stNum>0</span></h2>
+      <div id=stTable><p class=dim>Run SCAN STATIONS to populate.</p></div>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>DEVICE NAMES <span class=dim id=nNum>0</span></h2>
+      <div id=nTable><p class=dim>No names resolved yet.</p></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=index.html>Dashboard</a> | <a href=attack.html>Attack</a> | <a href=settings.html>Settings</a>
+</footer>

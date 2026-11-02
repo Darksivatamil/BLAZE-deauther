@@ -1,0 +1,43 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // SETTINGS</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/settings.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>SETTINGS</h1>
+      <p class=dim>Deauther + AP settings. Changes apply live; use SAVE to persist to EEPROM.</p>
+      <button onclick="save()">SAVE SETTINGS</button>
+      <button onclick="load()" class="right cyan">RELOAD</button>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <button onclick="getFile('run?cmd=stopap');alert('AP stopped')" class=red>STOP ACCESS POINT</button>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>OPTIONS</h2>
+      <div id=settingsList><p class=dim>Loading...</p></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=index.html>Dashboard</a> | <a href=info.html>Info</a>
+</footer>

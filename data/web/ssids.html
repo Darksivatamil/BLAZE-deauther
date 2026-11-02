@@ -1,0 +1,58 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // SSIDs</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/ssids.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>SSIDs</h1>
+      <p class=dim>Beacon SSID list used by the BEACON attack. Clone from SCAN targets or add manually.</p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>ADD SSID</h2>
+      <p><label>Name</label><input type=text id=ssid placeholder="network name"></p>
+      <p><label><input type=checkbox id=enc> Encrypted (WPA2)</label></p>
+      <p><button onclick="add()">ADD</button>
+        <button onclick="addSelected()" class=cyan>CLONE SELECTED</button></p>
+    </div>
+    <div class="col-6 card">
+      <h2>RANDOM MODE</h2>
+      <p><label>Interval</label><input type=number id=interval value=10> s</p>
+      <p><label><input type=checkbox id=overwrite> Overwrite length</label></p>
+      <p>
+        <button id=randomBtn onclick="enableRandom()">ENABLE RANDOM</button>
+        <button onclick="disableRandom()" class=red>DISABLE</button>
+      </p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>LIST <span class=dim id=ssidNum>0</span></h2>
+      <div id=ssidTable><p class=dim>No SSIDs yet.</p></div>
+      <p style="margin-top:.8rem">
+        <button onclick="removeAll()" class=red>REMOVE ALL</button>
+        <button onclick="load()" class="right cyan">RELOAD</button>
+      </p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=attack.html>Attack</a> | <a href=scan.html>Scan</a> | <a href=index.html>Dashboard</a>
+</footer>

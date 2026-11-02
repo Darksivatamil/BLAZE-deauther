@@ -1,0 +1,175 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // DASHBOARD</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+
+  <!-- ===== status strip ===== -->
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>DASHBOARD</h1>
+    </div>
+  </div>
+
+  <div class=row id=statStrip>
+    <div class="col-3 card"><div class=k>SCAN</div><div class=v id=sScan>--</div></div>
+    <div class="col-3 card"><div class=k>ATTACK</div><div class=v id=sAtk>--</div></div>
+    <div class="col-3 card"><div class=k>TRACK</div><div class=v id=sTrk>--</div></div>
+    <div class="col-3 card"><div class=k>TWIN</div><div class=v id=sTwin>--</div></div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>MOOD</h2>
+      <p id=sMood class=bold>--</p>
+    </div>
+    <div class="col-6 card">
+      <h2>QUICK ACTIONS</h2>
+      <button onclick="qaScan()">SCAN APs</button>
+      <button onclick="qaStop()" class=red>STOP ALL</button>
+      <button onclick="location.href='tracker.html'" class=cyan>TRACKER</button>
+    </div>
+  </div>
+
+  <!-- ===== tabs ===== -->
+  <div class=row>
+    <div class=col-12>
+      <button class=tabBtn onclick="showTab('aps')">ACCESS POINTS</button>
+      <button class=tabBtn onclick="showTab('sts')">STATIONS</button>
+    </div>
+  </div>
+
+  <div class=row id=tabAps>
+    <div class="col-12 card">
+      <h2>NEARBY ACCESS POINTS</h2>
+      <div id=apWrap><p class=dim>Loading... run a scan first.</p></div>
+    </div>
+  </div>
+
+  <div class=row id=tabSts style="display:none">
+    <div class="col-12 card">
+      <h2>NEARBY STATIONS</h2>
+      <div id=stWrap><p class=dim>Loading... run a scan first.</p></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span id=version>BLAZE v2.7 // TEAM DARK</span><br>
+  <a href=scan.html>Scan</a> | <a href=attack.html>Attack</a> | <a href=settings.html>Settings</a>
+</footer>
+
+<script>
+/* ===== dashboard: live status + AP/ST tables via /blaze/status + scan.json ===== */
+var poll = null;
+
+function showTab(which) {
+	getE("tabAps").style.display = (which === "aps") ? "" : "none";
+	getE("tabSts").style.display = (which === "sts") ? "" : "none";
+}
+
+function qaScan() {
+	getFile("run?cmd=scan " + "-a", function () {
+		setTimeout(loadScan, 1500);
+	});
+}
+
+function qaStop() {
+	getFile("run?cmd=stop attack");
+	getFile("run?cmd=stop scan");
+	getFile("twin?cmd=stop");
+	getFile("/blaze/track", function () { }, 4000, "POST", null, null);
+	// send explicit stop body
+	var r = new XMLHttpRequest();
+	r.open("POST", "/blaze/track", true);
+	r.setRequestHeader("Content-Type", "application/json");
+	r.send(JSON.stringify({ on: false }));
+}
+
+function loadStatus() {
+	var r = new XMLHttpRequest();
+	r.open("GET", "/blaze/status", true);
+	r.timeout = 5000;
+	r.onreadystatechange = function () {
+		if (this.readyState === 4) {
+			if (this.status === 200) {
+				try {
+					var j = JSON.parse(this.responseText);
+					getE("sScan").textContent = j.scan ? "RUNNING" : "IDLE";
+					getE("sAtk").textContent = j.attack ? "RUNNING" : "IDLE";
+					getE("sTrk").textContent = j.track ? "TRACKING" : "IDLE";
+					getE("sTwin").textContent = j.twin ? "ACTIVE" : "IDLE";
+					getE("sMood").textContent = j.mood || "--";
+					showMessage("connected");
+				} catch (e) { }
+			} else {
+				showMessage("ERROR");
+			}
+		}
+	};
+	r.send();
+}
+
+function loadScan() {
+	getFile("scan.json", function (res) {
+		try { drawAps(JSON.parse(res)); } catch (e) { }
+	});
+}
+
+function drawAps(j) {
+	var aps = j.aps || [];
+	var sts = j.stations || [];
+
+	// AP table
+	if (!aps.length) {
+		getE("apWrap").innerHTML = "<p class=dim>No APs. Click SCAN APs.</p>";
+	} else {
+		var h = "<table><tr><th>#</th><th>SSID</th><th>Ch</th><th>RSSI</th><th>Enc</th><th>MAC</th></tr>";
+		for (var i = 0; i < aps.length; i++) {
+			var a = aps[i];
+			var w = parseInt(a[3]) + 130;
+			var cls = w < 50 ? "meter_red" : (w < 70 ? "meter_orange" : "meter_green");
+			h += "<tr><td>" + i + "</td><td>" + esc(a[0]) + "</td><td>" + a[2] +
+				"</td><td class='" + cls + "'>" + a[3] + "</td><td>" + esc(a[4]) +
+				"</td><td class=dim>" + esc(a[1]) + "</td></tr>";
+		}
+		h += "</table>";
+		getE("apWrap").innerHTML = h;
+	}
+
+	// ST table
+	if (!sts.length) {
+		getE("stWrap").innerHTML = "<p class=dim>No stations. Run SCAN AP + ST.</p>";
+	} else {
+		var s = "<table><tr><th>#</th><th>MAC</th><th>AP</th><th>Pkts</th></tr>";
+		for (var k = 0; k < sts.length; k++) {
+			var b = sts[k];
+			s += "<tr><td>" + k + "</td><td>" + esc(b[0]) + "</td><td>" + esc(b[1]) +
+				"</td><td>" + b[2] + "</td></tr>";
+		}
+		s += "</table>";
+		getE("stWrap").innerHTML = s;
+	}
+	showMessage("connected");
+}
+
+function boot() {
+	loadStatus();
+	loadScan();
+	poll = setInterval(function () { loadStatus(); }, 3000);
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+</script>

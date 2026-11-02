@@ -1,0 +1,76 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // TRACKER</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/tracker.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>TRACKER</h1>
+      <p class=dim>Pick a target before tracking starts. RSSI gauge + distance estimate + warm/cold direction.</p>
+    </div>
+  </div>
+
+  <!-- ===== STEP 1: choose target ===== -->
+  <div class=row id=pickWrap>
+    <div class="col-12 card">
+      <h2>STEP 1 // SELECT TARGET</h2>
+      <p id=pickCount class=dim>Scanning for access points...</p>
+      <div class=pickList id=pickList></div>
+      <p style="margin-top:.8rem">
+        <button onclick="trkReload()">RELOAD APS</button>
+        <button onclick="trkStartScan()" class=cyan>SCAN NOW</button>
+        <button id=trkGo onclick="trkStart()" class=green disabled>START TRACKING</button>
+      </p>
+      <p id=trkMsg class=dim></p>
+    </div>
+  </div>
+
+  <!-- ===== STEP 2: live track (hidden until tracking) ===== -->
+  <div class=row id=liveWrap style="display:none">
+    <div class=col-12>
+      <div class=trackerGrid>
+        <div class="statBox"><div class=k>Target</div><div class=v id=tSsid style="font-size:1rem">--</div></div>
+        <div class="statBox"><div class=k>RSSI</div><div class=v id=tRssi>--</div></div>
+        <div class="statBox"><div class=k>Distance</div><div class=v id=tDist>--</div></div>
+        <div class="statBox"><div class=k>Direction</div><div class=v id=tDir>--</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class=row id=liveWrap2 style="display:none">
+    <div class="col-6 card">
+      <h2>SIGNAL</h2>
+      <div class=gauge><i id=tBar style="width:0%"></i></div>
+      <p class=dim id=tStatus>--</p>
+      <canvas id=tHist width=280 height=80 style="width:100%;margin-top:.6rem"></canvas>
+    </div>
+    <div class="col-6 card">
+      <h2>CONTROL</h2>
+      <p>
+        <button onclick="trkCalibrate()">CALIBRATE @ 1m</button>
+        <button onclick="trkStop()" class=red>STOP TRACKING</button>
+      </p>
+      <hr>
+      <p class=dim>ENV: <span id=tEnv>--</span> // TXP: <span id=tTxp>--</span></p>
+      <p class=dim>MIN DIST: <span id=tMin>--</span></p>
+      <p id=trkMsg2 class=dim></p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=scan.html>Scan</a> | <a href=index.html>Dashboard</a>
+</footer>
