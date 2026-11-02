@@ -36,6 +36,13 @@ void Attack::start() {
     attackStartTime = currentTime;
     accesspoints.sortAfterChannel();
     stations.sortAfterChannel();
+    // zero per-second counters even when no attack was formally running
+    // (e.g. after one-shot CLI sends or EAPOL-capture kicks touched them)
+    deauth.packetCounter = 0;
+    beacon.packetCounter = 0;
+    probe.packetCounter  = 0;
+    csa.packetCounter    = 0;
+    tmpPacketRate        = 0;
     running = true;
 
     // one-line diagnostic: "why is it 0 pps?" is never silent again

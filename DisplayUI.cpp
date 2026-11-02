@@ -113,6 +113,12 @@ void DisplayUI::setup() {
         addMenuNode(&mainMenu, []() { return String("EVIL TWIN"); }, [this]() { // twin
             startTwin(-1);
         });
+        addMenuNode(&mainMenu, []() { // TWIN <style> (plan 3.4): cycle portal template
+            return String("TWIN ") + String(BlazeEvilTwin::templateName());
+        }, []() {
+            BlazeEvilTwin::cycleTemplate();
+        });
+        addMenuNode(&mainMenu, []() { return String("WEIGHTS"); }, &weightMenu); // FACE WEIGHTS (plan 3.2)
         addMenuNode(&mainMenu, []() { return String("RAIN ") + String(BlazeFx::rainEnabled() ? "ON" : "OFF"); }, []() { // fx
             BlazeFx::toggleRain();
         });
@@ -514,17 +520,23 @@ void DisplayUI::setup() {
             else attack.start(false, true, true, false, false, true, 0); // deauth + deauthAll, continuous
         });
         addMenuNode(&attackMenu, [this]() { // KICK & LURE (plan 4.3)
+            // self-heal: if both sides already stopped (timeout / capture done),
+            // show idle even when the flag is still set
+            bool klLive = kickLureActive && (BlazeEvilTwin::active() || attack.isRunning());
             String right;
-            if (kickLureActive) {
+            if (klLive && BlazeEvilTwin::active()) {
                 right = String(BlazeEvilTwin::attempts());
                 if (BlazeEvilTwin::captured().length()) right += ":PW";
                 else right += ":...";
+            } else if (klLive) {
+                right = "kick";
             } else {
                 right = "twin";
             }
             return leftRight("KICK", right, maxLen - 1);
         }, [this]() { // toggle kick-and-lure
-            if (kickLureActive) {
+            bool klLive = kickLureActive && (BlazeEvilTwin::active() || attack.isRunning());
+            if (klLive) {
                 kickLureActive = false;
                 BlazeEvilTwin::stop();
                 if (attack.isRunning()) attack.stop();
@@ -566,6 +578,24 @@ void DisplayUI::setup() {
             if (t < 0 && accesspoints.count() > 0) t = 0;
             if (t < 0) return; // no target AP
             BlazeRecon::startCapture(t);
+        });
+    });
+
+    // FACE WEIGHTS MENU (plan 3.2)
+    // click a reaction = +1 weight (0..20, wraps); saved to BlazeCfg on every click
+    createMenu(&weightMenu, &mainMenu, [this]() {
+        for (uint8_t i = 0; i < BlazeFace::weightCount(); i++) {
+            addMenuNode(&weightMenu, [this, i]() {
+                return leftRight(String(BlazeFace::reactionName(i)),
+                                 String(BlazeFace::getWeight(i)), maxLen - 1);
+            }, [i]() {
+                BlazeFace::bumpWeight(i);
+                BlazeFace::saveWeights();
+            });
+        }
+        addMenuNode(&weightMenu, []() { return String("RESET ALL"); }, []() {
+            BlazeFace::resetWeights();
+            BlazeFace::saveWeights();
         });
     });
 
@@ -1035,8 +1065,10 @@ void DisplayUI::checkPanic() {
 void DisplayUI::panicStop() {
     if (attack.isRunning()) attack.stop();
     if (scan.isScanning())  scan.stop();
+    if (BlazeRecon::capturing()) BlazeRecon::stopCapture();
     BlazeTracker::stop();
     BlazeEvilTwin::stop();
+    kickLureActive = false;
     prntln("PANIC: all attacks stopped");
 
     restoreMenuFont();

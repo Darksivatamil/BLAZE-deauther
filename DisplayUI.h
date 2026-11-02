@@ -185,6 +185,7 @@ class DisplayUI {
         Menu showMenu;
         Menu attackMenu;
         Menu clockMenu;
+        Menu weightMenu; // reaction weights editor (plan 3.2)
 
         Menu apListMenu;
         Menu stationListMenu;

@@ -6,6 +6,8 @@
 #include "settings.h"
 #include "wifi.h"
 #include "BlazeRecon.h"
+#include "BlazeEvilTwin.h"
+#include "BlazeCfg.h"
 
 /*
    Shitty code used less resources so I will keep this clusterfuck as it is,
@@ -734,6 +736,10 @@ void CLI::runCommand(String input) {
         else if (eqls(str, S_JSON_DISPLAYINTERFACE)) prntln(settings::getDisplaySettings().enabled);
         else if (eqls(str, S_JSON_DISPLAY_TIMEOUT)) prntln(settings::getDisplaySettings().timeout);
 
+        // BLAZE keys (BlazeCfg)
+        else if (strcmp(str, "twin.template") == 0) prntln(BlazeEvilTwin::templateName());
+        else if (strcmp(str, "kill.minutes") == 0) prntln((int)BlazeCfg::getInt("kill.minutes", 5));
+
         else {
             prnt(_tmp);
             prntln(" setting not found");
@@ -797,6 +803,20 @@ void CLI::runCommand(String input) {
         else if (eqls(str, S_JSON_DISPLAYINTERFACE)) newSettings.display.enabled = boolVal;
         else if (eqls(str, S_JSON_DISPLAY_TIMEOUT)) newSettings.display.timeout = unsignedVal;
 
+        // BLAZE keys (persisted in BlazeCfg, not the deauther settings blob)
+        else if (strcmp(str, "twin.template") == 0) {
+            BlazeEvilTwin::setTemplate(intVal);
+            prnt("Set twin.template = ");
+            prntln(BlazeEvilTwin::templateName());
+            return;
+        } else if (strcmp(str, "kill.minutes") == 0) {
+            if (unsignedVal < 1) unsignedVal = 1;
+            BlazeCfg::set("kill.minutes", String(unsignedVal));
+            prnt("Set kill.minutes = ");
+            prntln(unsignedVal);
+            return;
+        }
+
         else {
             prnt(str);
             prntln(" not found");
@@ -831,6 +851,7 @@ void CLI::runCommand(String input) {
         } else {
             scan.stop();
             attack.stop();
+            BlazeRecon::stopCapture();
             this->stop();
         }
     }

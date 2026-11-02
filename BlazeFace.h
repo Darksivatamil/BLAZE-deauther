@@ -27,6 +27,16 @@ namespace BlazeFace {
     int8_t moodBias();
     uint8_t reaction();           // current reaction id
     const char* reactionName();   // label for the current reaction
+    const char* reactionName(uint8_t idx); // label by reaction index
+
+    // ===== REACTION WEIGHTS EDITOR (plan 3.2) ===== //
+    uint8_t getWeight(uint8_t idx); // 0..20
+    void setWeight(uint8_t idx, uint8_t w);
+    void bumpWeight(uint8_t idx);   // +1, wraps 20 -> 0
+    void resetWeights();
+    void loadWeights();             // load BlazeCfg "face.weights" (CSV)
+    void saveWeights();             // persist to BlazeCfg
+    uint8_t weightCount();
 
     // ===== TEMP MESSAGE ("NOO!!" on login fail) ===== //
     void flashMessage(const String& txt, uint32_t ms);

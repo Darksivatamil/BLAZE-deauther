@@ -35,6 +35,7 @@ namespace BlazeCore {
         BlazeMood::setup();
         BlazeEvilTwin::setup();
         BlazeRecon::setup();
+        BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)
 
         if (settings::getDisplaySettings().enabled) {
             BlazeFace::setDisplay(&displayUI.display);

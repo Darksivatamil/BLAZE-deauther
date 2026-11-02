@@ -7,6 +7,8 @@
 
 #include <Arduino.h>
 
+#include "BlazeCfg.h"
+
 // =====================================================
 // DISPLAY ADAPTER (Adafruit-style helpers -> ThingPulse)
 // =====================================================
@@ -136,6 +138,24 @@ enum Reaction {
 
 const uint8_t TOTAL_REACTIONS = 26;
 
+// short display names per reaction (face label + WEIGHTS menu, plan 3.2)
+const char* const REACTION_NAMES[TOTAL_REACTIONS] = {
+    "NORMAL", "HAPPY", "BLINK", "LOOK L", "LOOK R", "SLEEPY",
+    "SURPRISED", "ANGRY", "SAD", "LOVE",
+    "EXCITED", "VERY HAPPY", "SUSPICIOUS", "SHY", "BORED", "THINKING",
+    "WORRIED", "FRUSTRATED", "CRYING", "LAUGHING", "CURIOUS", "WINK",
+    "DOUBTFUL", "PROUD", "DETERMINED", "RELAXED"
+};
+
+// default reaction weights (plan 3.2: runtime-editable, stored in BlazeCfg)
+const uint8_t WEIGHT_DEFAULTS[TOTAL_REACTIONS] = {
+    14, 10, 12, 6, 6, 5, // NORMAL HAPPY BLINK LOOK_L LOOK_R SLEEPY
+    5, 4, 4, 4,          // SURPRISED ANGRY SAD LOVE
+    5, 4, 3, 3, 3, 3,    // EXCITED VERY_HAPPY SUSPICIOUS SHY BORED THINKING
+    3, 2, 2, 3, 3, 3,    // WORRIED FRUSTRATED CRYING LAUGHING CURIOUS WINK
+    2, 2, 3, 4           // DOUBTFUL PROUD DETERMINED RELAXED
+};
+
 // =====================================================
 // STATE
 // =====================================================
@@ -204,42 +224,25 @@ namespace BlazeFace {
     // mood bias: filters which reactions are likely
     int8_t   moodBiasVal = 0;
 
+    // runtime reaction weights (plan 3.2) - persisted in BlazeCfg "face.weights"
+    uint8_t weights[TOTAL_REACTIONS];
+    bool    weightsReady = false;
+
+    void ensureWeights() {
+        if (weightsReady) return;
+        memcpy(weights, WEIGHT_DEFAULTS, TOTAL_REACTIONS);
+        weightsReady = true;
+    }
+
     // ===== helpers ===== //
 
     // weighted reaction picker (common reactions are more frequent)
     void pickReaction() {
-        static const uint8_t WEIGHTS[TOTAL_REACTIONS] = {
-            14, // NORMAL
-            10, // HAPPY
-            12, // BLINK
-            6,  // LOOK_LEFT
-            6,  // LOOK_RIGHT
-            5,  // SLEEPY
-            5,  // SURPRISED
-            4,  // ANGRY
-            4,  // SAD
-            4,  // LOVE
-            5,  // EXCITED
-            4,  // VERY_HAPPY
-            3,  // SUSPICIOUS
-            3,  // SHY
-            3,  // BORED
-            3,  // THINKING
-            3,  // WORRIED
-            2,  // FRUSTRATED
-            2,  // CRYING
-            3,  // LAUGHING
-            3,  // CURIOUS
-            3,  // WINK
-            2,  // DOUBTFUL
-            2,  // PROUD
-            3,  // DETERMINED
-            4   // RELAXED
-        };
+        ensureWeights();
 
         int total = 0;
         for (uint8_t i = 0; i < TOTAL_REACTIONS; i++) {
-            int w = WEIGHTS[i];
+            int w = weights[i];
             // mood filter: BRAVE favours bold faces, SAD favours low-energy faces
             if (moodBiasVal >= 2) {
                 if (i == SAD || i == SLEEPY || i == BORED || i == CRYING) w = 0;
@@ -254,7 +257,7 @@ namespace BlazeFace {
         int r = random(total);
         int acc = 0;
         for (uint8_t i = 0; i < TOTAL_REACTIONS; i++) {
-            int w = WEIGHTS[i];
+            int w = weights[i];
             if (moodBiasVal >= 2) {
                 if (i == SAD || i == SLEEPY || i == BORED || i == CRYING) w = 0;
             } else if (moodBiasVal <= -1) {
@@ -703,36 +706,76 @@ namespace BlazeFace {
 
     uint8_t reaction() { return currentReaction; }
 
-    const char* reactionName() {
-        switch (currentReaction) {
-            case NORMAL:     return "NORMAL";
-            case HAPPY:      return "HAPPY";
-            case BLINK:      return "BLINK";
-            case LOOK_LEFT:  return "LOOK L";
-            case LOOK_RIGHT: return "LOOK R";
-            case SLEEPY:     return "SLEEPY";
-            case SURPRISED:  return "SURPRISED";
-            case ANGRY:      return "ANGRY";
-            case SAD:        return "SAD";
-            case LOVE:       return "LOVE";
-            case EXCITED:    return "EXCITED";
-            case VERY_HAPPY: return "VERY HAPPY";
-            case SUSPICIOUS: return "SUSPICIOUS";
-            case SHY:        return "SHY";
-            case BORED:      return "BORED";
-            case THINKING:   return "THINKING";
-            case WORRIED:    return "WORRIED";
-            case FRUSTRATED: return "FRUSTRATED";
-            case CRYING:     return "CRYING";
-            case LAUGHING:   return "LAUGHING";
-            case CURIOUS:    return "CURIOUS";
-            case WINK:       return "WINK";
-            case DOUBTFUL:   return "DOUBTFUL";
-            case PROUD:      return "PROUD";
-            case DETERMINED: return "DETERMINED";
-            case RELAXED:    return "RELAXED";
-            default:         return "NORMAL";
+    // ===== reaction weights editor (plan 3.2) ===== //
+    // click = +1 (wraps 20 -> 0); persisted in BlazeCfg "face.weights"
+    uint8_t getWeight(uint8_t idx) {
+        if (idx >= TOTAL_REACTIONS) return 0;
+        ensureWeights();
+        return weights[idx];
+    }
+
+    void setWeight(uint8_t idx, uint8_t w) {
+        if (idx >= TOTAL_REACTIONS) return;
+        ensureWeights();
+        weights[idx] = (w > 20) ? 20 : w;
+    }
+
+    void bumpWeight(uint8_t idx) {
+        if (idx >= TOTAL_REACTIONS) return;
+        ensureWeights();
+        weights[idx] = (weights[idx] >= 20) ? 0 : weights[idx] + 1;
+    }
+
+    void resetWeights() {
+        memcpy(weights, WEIGHT_DEFAULTS, TOTAL_REACTIONS);
+        weightsReady = true;
+    }
+
+    uint8_t weightCount() { return TOTAL_REACTIONS; }
+
+    void saveWeights() {
+        ensureWeights();
+        String csv;
+        csv.reserve(TOTAL_REACTIONS * 3);
+        for (uint8_t i = 0; i < TOTAL_REACTIONS; i++) {
+            if (i) csv += ",";
+            csv += String(weights[i]);
         }
+        BlazeCfg::set("face.weights", csv);
+    }
+
+    void loadWeights() {
+        String csv = BlazeCfg::get("face.weights", "");
+        if (csv.length() == 0) { // no saved weights yet -> defaults
+            resetWeights();
+            return;
+        }
+
+        uint8_t tmp[TOTAL_REACTIONS];
+        memcpy(tmp, WEIGHT_DEFAULTS, TOTAL_REACTIONS);
+
+        uint8_t idx = 0;
+        int     pos = 0;
+        while (idx < TOTAL_REACTIONS && pos < (int)csv.length()) {
+            int comma = csv.indexOf(',', pos);
+            if (comma < 0) comma = csv.length();
+            int v = csv.substring(pos, comma).toInt();
+            if (v < 0) v = 0;
+            if (v > 20) v = 20;
+            tmp[idx++] = (uint8_t)v;
+            pos = comma + 1;
+        }
+        memcpy(weights, tmp, TOTAL_REACTIONS);
+        weightsReady = true;
+    }
+
+    const char* reactionName(uint8_t idx) {
+        if (idx >= TOTAL_REACTIONS) return REACTION_NAMES[0];
+        return REACTION_NAMES[idx];
+    }
+
+    const char* reactionName() {
+        return reactionName(currentReaction);
     }
 
     void flashMessage(const String& txt, uint32_t ms) {
