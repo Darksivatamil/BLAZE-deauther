@@ -1,7 +1,7 @@
 /* BLAZE - Team DARK
    Glue between the deauther core and the BLAZE modules
    - boot: loading -> greeting -> wake-up -> anime face
-   - tracker + fx tick (confetti, matrix rain) */
+   - tracker + fx tick (glitch tear, matrix rain) */
 
 #include "BlazeCore.h"
 
@@ -12,7 +12,7 @@
 #include "BlazeFace.h"
 #include "BlazeTracker.h"
 #include "BlazeFx.h"
-#include "BlazeMood.h"
+#include "BlazePersona.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "BlazeCfg.h"
@@ -24,6 +24,7 @@ extern DisplayUI displayUI;
 namespace BlazeCore {
     bool prevAttack = false;
     bool prevScan   = false; // wantLoop state of the scan beep
+    bool bootLogged = false; // EV_BOOT fired once when the face wakes
 
     // KILL-mode state (plan 4.7)
     bool     prevKill   = false;
@@ -32,7 +33,7 @@ namespace BlazeCore {
     void setup() {
         BlazeTracker::setup();
         BlazeFx::setup();
-        BlazeMood::setup();
+        BlazePersona::setup();
         BlazeEvilTwin::setup();
         BlazeRecon::setup();
         BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)
@@ -47,29 +48,42 @@ namespace BlazeCore {
     void update() {
         BlazeFace::update();
         BlazeTracker::update();
-        BlazeMood::update();
+        BlazePersona::update();
         BlazeEvilTwin::update();
         BlazeRecon::update(); // pcap flush + EAPOL capture phase machine
 
-        // attack start/stop -> mood + confetti
+        // boot animation finished -> companion says hello (once)
+        if (!bootLogged && BlazeFace::bootDone()) {
+            bootLogged = true;
+            BlazePersona::onEvent(BlazePersona::EV_BOOT);
+        }
+
+        // scanning / tracking -> keep the hunting stance alive (no line)
+        bool scn = scan.isScanning();
+
+        if (scn) BlazePersona::poke(BlazePersona::ST_PROWL, 3000);
+        if (BlazeTracker::active() && BlazeTracker::hasSignal())
+            BlazePersona::poke(BlazePersona::ST_PROWL, 3000);
+
+        // attack start/stop -> persona + glitch burst
         bool atk = attack.isRunning();
 
-        if (atk && !prevAttack) BlazeMood::onAttackStart();
+        if (atk && !prevAttack) BlazePersona::onEvent(BlazePersona::EV_ATTACK);
         if (!atk && prevAttack) {
-            BlazeMood::onAttackStop();
-            BlazeFx::confettiStart();
+            BlazePersona::onEvent(BlazePersona::EV_ATTACK_DONE);
+            BlazeFx::glitchStart();
         }
         prevAttack = atk;
+        if (atk) BlazePersona::poke(BlazePersona::ST_HUNGRY, 3000); // feeding wins
 
         // ===== KILL mode polish (plan 4.7) =====
-        // start -> alert mood + "KILL!" face flash; auto-stop after
+        // start -> KILL persona line; auto-stop after
         // kill.minutes (default 5) so a forgotten flood can't run forever
         bool kill = attack.isKill();
 
         if (kill && !prevKill) {
             killStart = millis();
-            BlazeMood::setMood(BlazeMood::MOOD_ALERT);
-            BlazeFace::flashMessage("KILL!", 1200);
+            BlazePersona::onEvent(BlazePersona::EV_KILL);
         }
         if (kill) {
             long mins = BlazeCfg::getInt("kill.minutes", 5);
@@ -82,10 +96,8 @@ namespace BlazeCore {
         }
         prevKill = kill;
 
-        // scan finished -> mood blip
-        bool scn = scan.isScanning();
-
-        if (!scn && prevScan) BlazeMood::onScanDone();
+        // scan finished -> persona blip
+        if (!scn && prevScan) BlazePersona::onEvent(BlazePersona::EV_SCAN_DONE);
         prevScan = scn;
     }
 }

@@ -1,6 +1,6 @@
 /* BLAZE - Team DARK
    Screen effects:
-   - confetti burst (2s) when an attack finishes
+   - glitch screen-tear burst (2s) when an attack finishes
    - matrix rain background behind the menu text */
 
 #pragma once
@@ -12,10 +12,10 @@ class OLEDDisplay;
 namespace BlazeFx {
     void setup(); // loads rain setting from cfg
 
-    // ---- confetti ---- //
-    void confettiStart();
-    bool confettiActive();
-    void confettiDraw(OLEDDisplay* d); // advances + paints, call after scene draw
+    // ---- glitch (screen tear) ---- //
+    void glitchStart();
+    bool glitchActive();
+    void glitchDraw(OLEDDisplay* d); // tears the frame buffer, call after scene draw
 
     // ---- matrix rain (menu background) ---- //
     bool rainEnabled();

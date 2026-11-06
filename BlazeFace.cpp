@@ -129,10 +129,10 @@ const int EYE_R = 5;
 // =====================================================
 
 enum Reaction {
-    NORMAL = 0, HAPPY, BLINK, LOOK_LEFT, LOOK_RIGHT, SLEEPY,
-    SURPRISED, ANGRY, SAD, LOVE,
-    EXCITED, VERY_HAPPY, SUSPICIOUS, SHY, BORED, THINKING,
-    WORRIED, FRUSTRATED, CRYING, LAUGHING, CURIOUS, WINK,
+    NORMAL = 0, GRIN, BLINK, LOOK_LEFT, LOOK_RIGHT, SLEEPY,
+    SURPRISED, ANGRY, FLAT, LOCKED_ON,
+    HUNGRY, SMUG, SUSPICIOUS, SCOFF, BORED, THINKING,
+    PARANOID, FRUSTRATED, HOLLOW, CACKLE, CURIOUS, WINK,
     DOUBTFUL, PROUD, DETERMINED, RELAXED
 };
 
@@ -140,19 +140,19 @@ const uint8_t TOTAL_REACTIONS = 26;
 
 // short display names per reaction (face label + WEIGHTS menu, plan 3.2)
 const char* const REACTION_NAMES[TOTAL_REACTIONS] = {
-    "NORMAL", "HAPPY", "BLINK", "LOOK L", "LOOK R", "SLEEPY",
-    "SURPRISED", "ANGRY", "SAD", "LOVE",
-    "EXCITED", "VERY HAPPY", "SUSPICIOUS", "SHY", "BORED", "THINKING",
-    "WORRIED", "FRUSTRATED", "CRYING", "LAUGHING", "CURIOUS", "WINK",
+    "NORMAL", "GRIN", "BLINK", "LOOK L", "LOOK R", "SLEEPY",
+    "SURPRISED", "ANGRY", "FLAT", "LOCKED ON",
+    "HUNGRY", "SMUG", "SUSPICIOUS", "SCOFF", "BORED", "THINKING",
+    "PARANOID", "FRUSTRATED", "HOLLOW", "CACKLE", "CURIOUS", "WINK",
     "DOUBTFUL", "PROUD", "DETERMINED", "RELAXED"
 };
 
 // default reaction weights (plan 3.2: runtime-editable, stored in BlazeCfg)
 const uint8_t WEIGHT_DEFAULTS[TOTAL_REACTIONS] = {
-    14, 10, 12, 6, 6, 5, // NORMAL HAPPY BLINK LOOK_L LOOK_R SLEEPY
-    5, 4, 4, 4,          // SURPRISED ANGRY SAD LOVE
-    5, 4, 3, 3, 3, 3,    // EXCITED VERY_HAPPY SUSPICIOUS SHY BORED THINKING
-    3, 2, 2, 3, 3, 3,    // WORRIED FRUSTRATED CRYING LAUGHING CURIOUS WINK
+    14, 10, 12, 6, 6, 5, // NORMAL GRIN BLINK LOOK_L LOOK_R SLEEPY
+    5, 4, 4, 4,          // SURPRISED ANGRY FLAT LOCKED_ON
+    5, 4, 3, 3, 3, 3,    // HUNGRY SMUG SUSPICIOUS SCOFF BORED THINKING
+    3, 2, 2, 3, 3, 3,    // PARANOID FRUSTRATED HOLLOW CACKLE CURIOUS WINK
     2, 2, 3, 4           // DOUBTFUL PROUD DETERMINED RELAXED
 };
 
@@ -221,8 +221,8 @@ namespace BlazeFace {
     String   flashText;
     uint32_t flashUntil = 0;
 
-    // mood bias: filters which reactions are likely
-    int8_t   moodBiasVal = 0;
+    // stance bias: filters which reactions are likely
+    int8_t   biasVal = 0;
 
     // runtime reaction weights (plan 3.2) - persisted in BlazeCfg "face.weights"
     uint8_t weights[TOTAL_REACTIONS];
@@ -243,11 +243,11 @@ namespace BlazeFace {
         int total = 0;
         for (uint8_t i = 0; i < TOTAL_REACTIONS; i++) {
             int w = weights[i];
-            // mood filter: BRAVE favours bold faces, SAD favours low-energy faces
-            if (moodBiasVal >= 2) {
-                if (i == SAD || i == SLEEPY || i == BORED || i == CRYING) w = 0;
-            } else if (moodBiasVal <= -1) {
-                if (i == ANGRY || i == EXCITED || i == LOVE || i == PROUD || i == DETERMINED) w = 0;
+            // stance filter: hungry favours bold faces, unimpressed favours cold ones
+            if (biasVal >= 2) {
+                if (i == FLAT || i == SLEEPY || i == BORED || i == HOLLOW) w = 0;
+            } else if (biasVal <= -1) {
+                if (i == ANGRY || i == HUNGRY || i == LOCKED_ON || i == PROUD || i == DETERMINED) w = 0;
             }
             total += w;
         }
@@ -258,10 +258,10 @@ namespace BlazeFace {
         int acc = 0;
         for (uint8_t i = 0; i < TOTAL_REACTIONS; i++) {
             int w = weights[i];
-            if (moodBiasVal >= 2) {
-                if (i == SAD || i == SLEEPY || i == BORED || i == CRYING) w = 0;
-            } else if (moodBiasVal <= -1) {
-                if (i == ANGRY || i == EXCITED || i == LOVE || i == PROUD || i == DETERMINED) w = 0;
+            if (biasVal >= 2) {
+                if (i == FLAT || i == SLEEPY || i == BORED || i == HOLLOW) w = 0;
+            } else if (biasVal <= -1) {
+                if (i == ANGRY || i == HUNGRY || i == LOCKED_ON || i == PROUD || i == DETERMINED) w = 0;
             }
             acc += w;
             if (r < acc) { currentReaction = i; return; }
@@ -288,7 +288,7 @@ namespace BlazeFace {
         eye(RIGHT_X, NORMAL_Y, EYE_W, EYE_H, EYE_R);
     }
 
-    void happyEyes() {
+    void grinEyes() {
         eye(LEFT_X, 28, 30, 13, 5);
         eye(RIGHT_X, 28, 30, 13, 5);
     }
@@ -328,38 +328,45 @@ namespace BlazeFace {
         bfFillTriangle(RIGHT_X, NORMAL_Y, RIGHT_X + EYE_W, NORMAL_Y, RIGHT_X + EYE_W, NORMAL_Y + 8, BF_BLACK);
     }
 
-    void sadEyes() {
+    void flatEyes() {
         eye(LEFT_X, 29, 30, 13, 5);
         eye(RIGHT_X, 29, 30, 13, 5);
         bfFillRect(LEFT_X, 29, 30, 4, BF_BLACK);
         bfFillRect(RIGHT_X, 29, 30, 4, BF_BLACK);
     }
 
-    void drawHeart(int cx, int cy) {
-        d->setColor(BF_BLACK);
-        d->fillCircle(cx - 4, cy - 3, 4);
-        d->fillCircle(cx + 4, cy - 3, 4);
-        bfFillTriangle(cx - 8, cy - 1, cx + 8, cy - 1, cx, cy + 8, BF_BLACK);
-    }
-
-    void loveEyes() {
+    void lockedOnEyes() {
+        // target reticle overlaid on the eyes
         normalEyes();
-        drawHeart(35, 30);
-        drawHeart(93, 30);
+        int cy = NORMAL_Y + EYE_H / 2;
+        d->setColor(BF_BLACK);
+        // crosshair inside each eye
+        d->drawHorizontalLine(LEFT_X + 2, cy, EYE_W - 4);
+        d->drawVerticalLine(LEFT_X + EYE_W / 2, NORMAL_Y + 2, EYE_H - 4);
+        d->drawHorizontalLine(RIGHT_X + 2, cy, EYE_W - 4);
+        d->drawVerticalLine(RIGHT_X + EYE_W / 2, NORMAL_Y + 2, EYE_H - 4);
+        // white target ticks outside (on the black background)
+        d->setColor(BF_WHITE);
+        d->drawHorizontalLine(LEFT_X - 6, cy, 5);
+        d->drawHorizontalLine(LEFT_X + EYE_W + 1, cy, 5);
+        d->drawVerticalLine(LEFT_X + EYE_W / 2, NORMAL_Y - 6, 5);
+        d->drawHorizontalLine(RIGHT_X - 6, cy, 5);
+        d->drawHorizontalLine(RIGHT_X + EYE_W + 1, cy, 5);
+        d->drawVerticalLine(RIGHT_X + EYE_W / 2, NORMAL_Y - 6, 5);
     }
 
     // ---- extended reactions (20 more, from the reference .ino) ---- //
 
-    void excitedEyes() {
+    void hungryEyes() {
         eye(LEFT_X, 20, 30, 20, 6);
         eye(RIGHT_X, 20, 30, 20, 6);
-        // sparkle pixels
+        // slit pupils, no sparkles
         d->setColor(BF_BLACK);
-        d->setPixel(LEFT_X + 8, 26);
-        d->setPixel(RIGHT_X + 8, 26);
+        d->fillRect(LEFT_X + 13, 23, 4, 14);
+        d->fillRect(RIGHT_X + 13, 23, 4, 14);
     }
 
-    void veryHappyEyes() {
+    void smugEyes() {
         // big upward arcs (filled crescents)
         bfFillRoundRect(LEFT_X, 26, 30, 12, 6, BF_WHITE);
         bfFillRoundRect(RIGHT_X, 26, 30, 12, 6, BF_WHITE);
@@ -375,17 +382,14 @@ namespace BlazeFace {
         bfFillRect(RIGHT_X + 14, 22, 16, 17, BF_BLACK);
     }
 
-    void shyEyes() {
-        // small averted eyes + blush dots
+    void scoffEyes() {
+        // averted flat lids + hard angular cut (was: shy + blush dots)
         eye(LEFT_X + 2, 27, 24, 12, 5);
         eye(RIGHT_X + 2, 27, 24, 12, 5);
         bfFillRect(LEFT_X + 12, 27, 12, 12, BF_BLACK);
         bfFillRect(RIGHT_X + 12, 27, 12, 12, BF_BLACK);
-        d->setColor(BF_WHITE);
-        d->setPixel(14, 40);
-        d->setPixel(15, 40);
-        d->setPixel(112, 40);
-        d->setPixel(113, 40);
+        bfFillTriangle(LEFT_X + 2, 27, LEFT_X + 26, 27, LEFT_X + 2, 33, BF_BLACK);
+        bfFillTriangle(RIGHT_X + 26, 27, RIGHT_X + 2, 27, RIGHT_X + 26, 33, BF_BLACK);
     }
 
     void boredEyes() {
@@ -406,7 +410,7 @@ namespace BlazeFace {
         bfFillRect(RIGHT_X, 22, 30, 4, BF_BLACK);
     }
 
-    void worriedEyes() {
+    void paranoidEyes() {
         // wide eyes, inner brows tilted down
         eye(LEFT_X, 20, 30, 16, 5);
         eye(RIGHT_X, 20, 30, 16, 5);
@@ -422,17 +426,21 @@ namespace BlazeFace {
         bfFillTriangle(RIGHT_X, 26, RIGHT_X + EYE_W, 26, RIGHT_X + EYE_W, 32, BF_BLACK);
     }
 
-    void cryingEyes() {
-        sadEyes();
-        // tear streams
+    void hollowEyes() {
+        // dead hollow sockets - outline only, no tears (was: crying)
         d->setColor(BF_WHITE);
-        d->drawVerticalLine(LEFT_X + 6, 44, 10);
-        d->drawVerticalLine(RIGHT_X + 6, 44, 10);
-        d->drawVerticalLine(LEFT_X + 7, 46, 8);
-        d->drawVerticalLine(RIGHT_X + 7, 46, 8);
+        d->drawRect(LEFT_X, NORMAL_Y, EYE_W, EYE_H);
+        d->drawRect(RIGHT_X, NORMAL_Y, EYE_W, EYE_H);
+        d->setColor(BF_BLACK);
+        d->fillRect(LEFT_X + 1, NORMAL_Y + 1, EYE_W - 2, EYE_H - 2);
+        d->fillRect(RIGHT_X + 1, NORMAL_Y + 1, EYE_W - 2, EYE_H - 2);
+        // faint inner glint so the void reads as an eye
+        d->setColor(BF_WHITE);
+        d->drawHorizontalLine(LEFT_X + 11, NORMAL_Y + 8, 8);
+        d->drawHorizontalLine(RIGHT_X + 11, NORMAL_Y + 8, 8);
     }
 
-    void laughingEyes() {
+    void cackleEyes() {
         // closed happy arcs (^ ^)
         bfFillRoundRect(LEFT_X, 28, 30, 8, 4, BF_WHITE);
         bfFillRoundRect(RIGHT_X, 28, 30, 8, 4, BF_WHITE);
@@ -494,25 +502,25 @@ namespace BlazeFace {
         const char* label = "";
         switch (reaction) {
             case NORMAL:     label = "normal";     break;
-            case HAPPY:      label = "happy";      break;
+            case GRIN:       label = "grin";       break;
             case BLINK:      label = "blink";      break;
             case LOOK_LEFT:  label = "lookL";      break;
             case LOOK_RIGHT: label = "lookR";      break;
             case SLEEPY:     label = "sleepy";     break;
             case SURPRISED:  label = "surprised";  break;
             case ANGRY:      label = "angry";      break;
-            case SAD:        label = "sad";        break;
-            case LOVE:       label = "love";       break;
-            case EXCITED:    label = "excited";    break;
-            case VERY_HAPPY: label = "veryhappy";  break;
+            case FLAT:       label = "flat";       break;
+            case LOCKED_ON:  label = "locked";     break;
+            case HUNGRY:     label = "hungry";     break;
+            case SMUG:       label = "smug";       break;
             case SUSPICIOUS: label = "suspicious"; break;
-            case SHY:        label = "shy";        break;
+            case SCOFF:      label = "scoff";      break;
             case BORED:      label = "bored";      break;
             case THINKING:   label = "thinking";   break;
-            case WORRIED:    label = "worried";    break;
+            case PARANOID:   label = "paranoid";   break;
             case FRUSTRATED: label = "frustrated"; break;
-            case CRYING:     label = "crying";     break;
-            case LAUGHING:   label = "laughing";   break;
+            case HOLLOW:     label = "hollow";     break;
+            case CACKLE:     label = "cackle";     break;
             case CURIOUS:    label = "curious";    break;
             case WINK:       label = "wink";       break;
             case DOUBTFUL:   label = "doubtful";   break;
@@ -534,25 +542,25 @@ namespace BlazeFace {
 
         switch (reaction) {
             case NORMAL:     normalEyes();      break;
-            case HAPPY:      happyEyes();       break;
+            case GRIN:       grinEyes();        break;
             case BLINK:      blinkEyes();       break;
             case LOOK_LEFT:  lookLeft();        break;
             case LOOK_RIGHT: lookRight();       break;
             case SLEEPY:     sleepyEyes();      break;
             case SURPRISED:  surprisedEyes();   break;
             case ANGRY:      angryEyes();       break;
-            case SAD:        sadEyes();         break;
-            case LOVE:       loveEyes();        break;
-            case EXCITED:    excitedEyes();     break;
-            case VERY_HAPPY: veryHappyEyes();   break;
+            case FLAT:       flatEyes();        break;
+            case LOCKED_ON:  lockedOnEyes();    break;
+            case HUNGRY:     hungryEyes();      break;
+            case SMUG:       smugEyes();        break;
             case SUSPICIOUS: suspiciousEyes();  break;
-            case SHY:        shyEyes();         break;
+            case SCOFF:      scoffEyes();       break;
             case BORED:      boredEyes();       break;
             case THINKING:   thinkingEyes();    break;
-            case WORRIED:    worriedEyes();     break;
+            case PARANOID:   paranoidEyes();    break;
             case FRUSTRATED: frustratedEyes();  break;
-            case CRYING:     cryingEyes();      break;
-            case LAUGHING:   laughingEyes();    break;
+            case HOLLOW:     hollowEyes();      break;
+            case CACKLE:     cackleEyes();      break;
             case CURIOUS:    curiousEyes();     break;
             case WINK:       winkEyes();        break;
             case DOUBTFUL:   doubtfulEyes();    break;
@@ -701,8 +709,8 @@ namespace BlazeFace {
         startReaction(random(TOTAL_REACTIONS));
     }
 
-    void setMoodBias(int8_t bias) { moodBiasVal = bias; }
-    int8_t moodBias() { return moodBiasVal; }
+    void setBias(int8_t bias) { biasVal = bias; }
+    int8_t bias() { return biasVal; }
 
     uint8_t reaction() { return currentReaction; }
 
@@ -857,10 +865,10 @@ namespace BlazeFace {
 
         if (blinking && (now - blinkStarted >= 120)) {
             blinking      = false;
-            // mood scales blink rate: ALERT/brave blink faster, SLEEP slower
+            // stance scales blink rate: hungry/locked blink fast, unimpressed slow
             uint32_t lo = 1500, hi = 4501;
-            if (moodBiasVal >= 2)      { lo = 600;  hi = 1800; }
-            else if (moodBiasVal <= -1) { lo = 3000; hi = 7000; }
+            if (biasVal >= 2)      { lo = 600;  hi = 1800; }
+            else if (biasVal <= -1) { lo = 3000; hi = 7000; }
             nextBlinkTime = now + random(lo, hi);
             return;
         }
@@ -908,7 +916,30 @@ namespace BlazeFace {
         d->setColor(BF_WHITE);
         d->setFont(ArialMT_Plain_16);
         d->setTextAlignment(TEXT_ALIGN_CENTER);
-        d->drawString(64, 16, flashText);
+
+        // wrap long persona lines (max 3 lines) so nothing clips off-screen
+        String seg[3];
+        uint8_t n = 0;
+        String rem = flashText;
+        while (rem.length()) {
+            if (d->getStringWidth(rem) <= 124 || n == 2) { seg[n++] = rem; break; }
+            int mid = (int)rem.length() / 2;
+            int brk = rem.lastIndexOf(' ', mid);
+            if (brk <= 0) brk = rem.indexOf(' ', mid);
+            if (brk <= 0) { seg[n++] = rem; break; }
+            seg[n++] = rem.substring(0, brk);
+            rem = rem.substring(brk + 1);
+        }
+
+        if (n == 1) {
+            d->drawString(64, 16, seg[0]); // short lines keep the old position
+        } else {
+            int y = (64 - n * 19) / 2; // ArialMT_Plain_16 line height = 19
+            for (uint8_t i = 0; i < n; i++) {
+                d->drawString(64, y, seg[i]);
+                y += 19;
+            }
+        }
         d->setTextAlignment(TEXT_ALIGN_LEFT);
     }
 }

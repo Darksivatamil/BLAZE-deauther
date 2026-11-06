@@ -1,7 +1,7 @@
 /* BLAZE - Team DARK
    Glue between the deauther core and the BLAZE modules
    - boot: 4s loading -> wake-up -> anime face
-   - sound hooks driven by attack/scan state (read-only, no core edits) */
+   - persona/stance hooks driven by attack/scan state (read-only, no core edits) */
 
 #pragma once
 

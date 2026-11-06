@@ -8,6 +8,7 @@
 
 #include "Attack.h"
 #include "Scan.h"
+#include "BlazePersona.h"
 
 extern Attack attack;
 extern Scan   scan;
@@ -235,6 +236,13 @@ namespace BlazeRecon {
 
     void update() {
         flushEapol(); // main-loop flash writes (never in RX context)
+
+        // persona: handshake frames arriving -> LOCKED (main loop only,
+        // the actual capEapol++ runs in RX context and must not allocate)
+        static uint8_t lastCap = 0;
+        if (capEapol > lastCap) BlazePersona::onEvent(BlazePersona::EV_EAPOL);
+        lastCap = capEapol;
+
         if (capPhase == CAP_OFF) return;
 
         uint32_t now = millis();

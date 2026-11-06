@@ -9,6 +9,7 @@
 #include "Accesspoints.h"
 #include "wifi.h"
 #include "BlazeCfg.h"
+#include "BlazePersona.h"
 
 extern Accesspoints accesspoints;
 extern String escape(String str);
@@ -78,6 +79,7 @@ namespace BlazeEvilTwin {
         validating = false;
         startedAt  = millis();
 
+        BlazePersona::onEvent(BlazePersona::EV_TWIN_START);
         return true;
     }
 
@@ -103,6 +105,7 @@ namespace BlazeEvilTwin {
 
     void update() {
         if (!activeFlag) return;
+        BlazePersona::poke(BlazePersona::ST_HUNGRY, 3000); // feeding while the twin runs
 
         // timeout
         if (millis() - startedAt > TIMEOUT_MS) {
@@ -122,6 +125,7 @@ namespace BlazeEvilTwin {
             // password was correct!
             capturedPw = pendingPw;
             validating = false;
+            BlazePersona::onEvent(BlazePersona::EV_TWIN_CREDS);
             // disconnect STA only - NEVER WiFi.disconnect(true): that disables
             // the STA interface and re-initialises mode mid-twin (portal blips)
             WiFi.disconnect(false, true);

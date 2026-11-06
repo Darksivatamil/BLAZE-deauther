@@ -5,7 +5,7 @@
 #include "settings.h"
 #include "BlazeTracker.h"
 #include "BlazeFx.h"
-#include "BlazeMood.h"
+#include "BlazePersona.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 
@@ -691,6 +691,7 @@ void DisplayUI::on() {
         configOn();
         tempOff    = false;
         buttonTime = currentTime; // update a button time to keep display on
+        BlazePersona::onStandby(false);
         prntln(D_MSG_DISPLAY_ON);
     } else {
         prntln(D_ERROR_NOT_ENABLED);
@@ -701,6 +702,7 @@ void DisplayUI::off() {
     if (enabled) {
         configOff();
         tempOff = true;
+        BlazePersona::onStandby(true);
         prntln(D_MSG_DISPLAY_OFF);
     } else {
         prntln(D_ERROR_NOT_ENABLED);
@@ -1076,6 +1078,8 @@ void DisplayUI::panicStop() {
     mode       = DISPLAY_MODE::PANIC;
     buttonTime = currentTime;
     if (tempOff) on();
+
+    BlazePersona::onEvent(BlazePersona::EV_PANIC); // line only - flash skips the panic screen
 }
 
 void DisplayUI::drawPanic() {
@@ -1095,9 +1099,9 @@ void DisplayUI::drawPanic() {
     }
 }
 
-// ===== BLAZE: "NOO!!" after failed web login ===== //
+// ===== BLAZE: refused login -> persona interjection ===== //
 void DisplayUI::flashNoLogin() {
-    flashMsg("NOO!!", 2000);
+    BlazePersona::onEvent(BlazePersona::EV_LOGIN_FAIL);
 }
 
 // ===== BLAZE: short flash message on the face screen ===== //
@@ -1231,8 +1235,8 @@ void DisplayUI::draw(bool force) {
                 break;
         }
 
-        // confetti overlay (attack finished) on top of the scene
-        if (BlazeFx::confettiActive()) BlazeFx::confettiDraw(&display);
+        // glitch screen-tear overlay (attack finished) on top of the scene
+        if (BlazeFx::glitchActive()) BlazeFx::glitchDraw(&display);
 
         updateSuffix();
     }

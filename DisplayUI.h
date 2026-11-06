@@ -142,11 +142,14 @@ class DisplayUI {
         void on();
         void off();
 
-        // BLAZE: show "NOO!!" + descending tones after failed web login
+        // BLAZE: refused web login -> persona line + stance
         void flashNoLogin();
 
         // BLAZE: show a short flash message on the face screen
         void flashMsg(const String& txt, uint32_t ms);
+
+        // BLAZE: true while the screen is blanked (timeout / CLI off)
+        bool asleep() const { return tempOff; }
 
         // BLAZE: cycle -> face -> chat -> menu -> face ...
         void cycleMode();
@@ -235,7 +238,7 @@ class DisplayUI {
         void panicStop();    // stop attack + scan + tracker + twin instantly
         void drawPanic();
 
-        bool     blazeFlash     = false; // "NOO!!" overlay active
+        bool     blazeFlash     = false; // persona flash overlay active
         uint32_t panicUntil     = 0;     // when the PANIC screen auto-dismisses
         DISPLAY_MODE blazeFlashPrev = DISPLAY_MODE::MENU;
 

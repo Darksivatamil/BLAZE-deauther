@@ -7,70 +7,84 @@
 #include "src/esp8266-oled-ssd1306-4.1.0/OLEDDisplay.h"
 
 namespace BlazeFx {
-    // ===== confetti ===== //
-    const uint8_t  CF_N      = 18;
-    const uint32_t CF_MILLIS = 2200;
+    // ===== glitch (screen tear) ===== //
+    // Shreds the already-drawn frame buffer: horizontal bands get shifted,
+    // inverted and noised out, then the effect decays over GL_MILLIS.
+    const uint32_t GL_MILLIS = 2200;
+    uint32_t glEnd = 0;
 
-    struct CFP {
-        int16_t x;
-        int16_t y;
-        int8_t  vy;
-        uint8_t kind;
-    };
-
-    CFP    cf[CF_N];
-    uint32_t cfEnd = 0;
-
-    void confettiStart() {
-        for (uint8_t i = 0; i < CF_N; i++) {
-            cf[i].x    = random(0, 128);
-            cf[i].y    = random(-64, 0);
-            cf[i].vy   = 2 + random(0, 5);
-            cf[i].kind = random(0, 3);
-        }
-        cfEnd = millis() + CF_MILLIS;
+    void glitchStart() {
+        glEnd = millis() + GL_MILLIS;
     }
 
-    bool confettiActive() {
-        return (int32_t)(cfEnd - millis()) > 0;
+    bool glitchActive() {
+        return (int32_t)(glEnd - millis()) > 0;
     }
 
-    void confettiDraw(OLEDDisplay* d) {
-        if (!d || !confettiActive()) return;
+    // shift one pixel row horizontally (wrapping) inside the page buffer
+    static void tearRow(uint8_t* buf, int16_t y, int16_t shift) {
+        if (y < 0 || y > 63 || !shift) return;
+        uint8_t* page = buf + (y >> 3) * 128;
+        uint8_t  m    = (uint8_t)(1 << (y & 7));
 
-        uint32_t now = millis();
+        uint8_t tmp[128];
+        for (uint8_t x = 0; x < 128; x++) tmp[x] = (page[x] & m) ? 1 : 0;
 
-        for (uint8_t i = 0; i < CF_N; i++) {
-            cf[i].y += cf[i].vy;
-
-            if (cf[i].y > 66) {
-                cf[i].y = random(-16, 0);
-                cf[i].x = random(0, 128);
-            }
-
-            // twinkle: skip some particles on some frames
-            if (((now / 140) + i) % 4 == 0) continue;
-
-            int16_t x = cf[i].x;
-            int16_t y = cf[i].y;
-            if (y < 0 || y > 63 || x < 0 || x > 127) continue;
-
-            if (cf[i].kind == 0) {
-                d->setPixel(x, y);                                  // dot
-            } else if (cf[i].kind == 1) {
-                d->setPixel(x, y);                                  // plus
-                if (x > 0) d->setPixel(x - 1, y);
-                if (x < 127) d->setPixel(x + 1, y);
-                if (y > 0) d->setPixel(x, y - 1);
-                if (y < 63) d->setPixel(x, y + 1);
-            } else {
-                d->setPixel(x, y);                                  // x-shape
-                if (x > 0 && y > 0) d->setPixel(x - 1, y - 1);
-                if (x < 127 && y < 63) d->setPixel(x + 1, y + 1);
-                if (x < 127 && y > 0) d->setPixel(x + 1, y - 1);
-                if (x > 0 && y < 63) d->setPixel(x - 1, y + 1);
-            }
+        for (uint8_t x = 0; x < 128; x++) {
+            int16_t sx = (int16_t)x - shift;
+            if (sx < 0) sx += 128;
+            else if (sx >= 128) sx -= 128;
+            if (tmp[sx]) page[x] |= m;
+            else         page[x] = (uint8_t)(page[x] & ~m);
         }
+    }
+
+    static void invertRow(uint8_t* buf, int16_t y) {
+        if (y < 0 || y > 63) return;
+        uint8_t* page = buf + (y >> 3) * 128;
+        uint8_t  m    = (uint8_t)(1 << (y & 7));
+        for (uint8_t x = 0; x < 128; x++) page[x] ^= m;
+    }
+
+    static void noiseRow(uint8_t* buf, int16_t y) {
+        if (y < 0 || y > 63) return;
+        uint8_t* page = buf + (y >> 3) * 128;
+        uint8_t  m    = (uint8_t)(1 << (y & 7));
+        for (uint8_t x = 0; x < 128; x++) {
+            if (random(2)) page[x] |= m;
+            else           page[x] = (uint8_t)(page[x] & ~m);
+        }
+    }
+
+    void glitchDraw(OLEDDisplay* d) {
+        if (!d || !d->buffer || !glitchActive()) return;
+
+        uint32_t left = glEnd - millis();
+        // full strength for the first ~1.2s, then decay to a light flicker
+        uint8_t intensity = 4;
+        if (left < 1000) intensity = (uint8_t)(left / 250) + 1; // 1..4
+
+        uint8_t* buf = d->buffer;
+
+        // torn bands (horizontal displacement)
+        uint8_t bands = (uint8_t)(2 + random(0, intensity));
+        for (uint8_t b = 0; b < bands; b++) {
+            int16_t y0    = random(0, 64);
+            int16_t h     = 2 + random(0, 4 + 2 * intensity);
+            int16_t shift = random(-6 - 4 * intensity, 6 + 4 * intensity);
+            if (y0 + h > 64) h = 64 - y0;
+            for (int16_t y = y0; y < y0 + h; y++) tearRow(buf, y, shift);
+        }
+
+        // inverted slice
+        if (random(100) < 8 * intensity) {
+            int16_t y0 = random(0, 64);
+            int16_t h  = 1 + random(0, 4);
+            for (int16_t y = y0; y < y0 + h && y < 64; y++) invertRow(buf, y);
+        }
+
+        // static-noise line
+        if (random(100) < 6 * intensity) noiseRow(buf, random(0, 64));
     }
 
     // ===== matrix rain ===== //

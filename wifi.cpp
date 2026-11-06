@@ -21,7 +21,7 @@ extern "C" {
 #include "Scan.h"
 #include "DisplayUI.h"
 #include "BlazeTracker.h"
-#include "BlazeMood.h"
+#include "BlazePersona.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
@@ -400,7 +400,21 @@ namespace wifi {
             json += BlazeEvilTwin::active() ? "true" : "false";
             json += ",\"track\":";
             json += BlazeTracker::active() ? "true" : "false";
-            json += ",\"mood\":\"" + String(BlazeMood::name()) + "\"}";
+            uint8_t ln = BlazePersona::logCount();
+            json += ",\"stance\":\"" + String(BlazePersona::stanceName()) + "\"";
+            json += ",\"line\":\"" + String(ln ? BlazePersona::logLine(ln - 1) : "--") + "\"}";
+            server.send(200, str(W_JSON), json);
+        });
+
+        // persona voice log (oldest -> newest)
+        server.on("/blaze/log", HTTP_GET, []() {
+            String json = "[";
+            uint8_t n   = BlazePersona::logCount();
+            for (uint8_t i = 0; i < n; i++) {
+                if (i) json += ",";
+                json += "\"" + String(BlazePersona::logLine(i)) + "\"";
+            }
+            json += "]";
             server.send(200, str(W_JSON), json);
         });
 
@@ -433,7 +447,7 @@ namespace wifi {
         });
 
         server.on("/blaze/loginfail", HTTP_POST, []() {
-            displayUI.flashNoLogin(); // shows "NOO!!" face flash
+            displayUI.flashNoLogin(); // persona line + stance
             server.send(200, str(W_JSON), "{\"ok\":true}");
         });
 

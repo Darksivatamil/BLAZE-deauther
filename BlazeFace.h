@@ -23,8 +23,8 @@ namespace BlazeFace {
 
     // ===== FACE MODE ===== //
     void startFace();             // pick a random reaction (weighted)
-    void setMoodBias(int8_t bias);// -2 sad .. 0 calm .. +2 brave (filters reaction pool)
-    int8_t moodBias();
+    void setBias(int8_t bias);// -2 unimpressed .. 0 idle .. +2 hungry (filters reaction pool)
+    int8_t bias();
     uint8_t reaction();           // current reaction id
     const char* reactionName();   // label for the current reaction
     const char* reactionName(uint8_t idx); // label by reaction index
@@ -38,7 +38,7 @@ namespace BlazeFace {
     void saveWeights();             // persist to BlazeCfg
     uint8_t weightCount();
 
-    // ===== TEMP MESSAGE ("NOO!!" on login fail) ===== //
+    // ===== TEMP MESSAGE (persona flash line) ===== //
     void flashMessage(const String& txt, uint32_t ms);
     bool flashActive();
     void renderFlash();

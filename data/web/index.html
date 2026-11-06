@@ -30,8 +30,9 @@
 
   <div class=row>
     <div class="col-6 card">
-      <h2>MOOD</h2>
-      <p id=sMood class=bold>--</p>
+      <h2>STANCE</h2>
+      <p id=sStance class=bold>--</p>
+      <p id=sLine class=dim>--</p>
     </div>
     <div class="col-6 card">
       <h2>QUICK ACTIONS</h2>
@@ -110,7 +111,8 @@ function loadStatus() {
 					getE("sAtk").textContent = j.attack ? "RUNNING" : "IDLE";
 					getE("sTrk").textContent = j.track ? "TRACKING" : "IDLE";
 					getE("sTwin").textContent = j.twin ? "ACTIVE" : "IDLE";
-					getE("sMood").textContent = j.mood || "--";
+					getE("sStance").textContent = j.stance || "--";
+					getE("sLine").textContent = j.line || "--";
 					showMessage("connected");
 				} catch (e) { }
 			} else {
