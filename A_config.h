@@ -65,22 +65,12 @@
 #define BLAZE_USER "BLAZE"
 #define BLAZE_PASS "&bl@ze1234s678"
 
-// ===== BLAZE SOUND (PAM8403) ===== //
-#define BLAZE_SOUND_PIN 16 // D0 -> PAM8403 L input
-
 // ===== BLAZE MODE BUTTON ===== //
 #define BUTTON_MODE 0 // D3 (GPIO0) - REMOVED from UI (unused), only kept pulled up
 
-// ===== BLAZE AI (NVIDIA NIM) ===== //
-#define BLAZE_AI_HOST "integrate.api.nvidia.com"
-#define BLAZE_AI_PATH "/v1/chat/completions"
-#define BLAZE_AI_MODEL "nvidia/nemotron-3-super-120b-a12b"
-#define BLAZE_AI_KEY "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"
-
-// ===== BLAZE INTERNET UPLINK (for AI chat) ===== //
-// set your home WiFi here (or later via the chat web page)
-#define BLAZE_UPLINK_SSID ""
-#define BLAZE_UPLINK_PASS ""
+// ===== BLAZE COMPANION (offline only) ===== //
+// no AI uplink, no sound — text-only persona (see UPGRADE_PLAN.md)
+#define BLAZE_HOME_SSID "" // home/owned network - protected by OwnNetGuard + IntruderAlert
 
 // https://github.com/spacehuhntech/hackheld
 #if defined(HACKHELD_VEGA)
