@@ -1,0 +1,54 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // CHAT</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/chat.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>CHAT</h1>
+      <p class=dim>Offline companion. No uplink. He answers, he doesn't obey - attacks stay in the menus.</p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>BLAZE</h2>
+      <div id=chatLog class=chatLog></div>
+      <p style="margin-top:.8rem">
+        <input id=chatIn type=text maxlength=40 placeholder="say something..."
+               style="width:72%" onkeydown="if(event.key==='Enter')chatSend()">
+        <button onclick="chatSend()" class=green>SEND</button>
+      </p>
+      <p id=chatMsg class=dim></p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>STANCE</h2>
+      <p id=cStance class=bold>--</p>
+      <p id=cLine class=dim>--</p>
+    </div>
+    <div class="col-6 card">
+      <h2>TRY</h2>
+      <p class=dim>status? // report // uptime? // stance? // what do you see? // roast me</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=index.html>Dashboard</a> | <a href=scan.html>Scan</a>
+</footer>

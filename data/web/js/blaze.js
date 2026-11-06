@@ -23,11 +23,12 @@ function blazePost(url, body, cb) {
 
 /* ===== nav =====
    Central builder injected into <div id=nav> on every page.
-   Keeps KILL / CHAT removed. Marks the active page. */
+   Keeps KILL removed. Marks the active page. */
 var BLAZE_NAV = [
 	["scan.html", "SCAN"],
 	["ssids.html", "SSIDs"],
 	["attack.html", "ATTACK"],
+	["chat.html", "CHAT"],
 	["tracker.html", "TRACK"],
 	["twin.html", "TWIN"],
 	["settings.html", "SETTINGS"],

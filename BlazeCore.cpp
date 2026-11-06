@@ -13,6 +13,7 @@
 #include "BlazeTracker.h"
 #include "BlazeFx.h"
 #include "BlazePersona.h"
+#include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "BlazeCfg.h"
@@ -34,6 +35,7 @@ namespace BlazeCore {
         BlazeTracker::setup();
         BlazeFx::setup();
         BlazePersona::setup();
+        BlazeChat::setup();
         BlazeEvilTwin::setup();
         BlazeRecon::setup();
         BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)

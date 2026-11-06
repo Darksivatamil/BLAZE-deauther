@@ -22,6 +22,7 @@ extern "C" {
 #include "DisplayUI.h"
 #include "BlazeTracker.h"
 #include "BlazePersona.h"
+#include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
@@ -416,6 +417,32 @@ namespace wifi {
             }
             json += "]";
             server.send(200, str(W_JSON), json);
+        });
+
+        // ===== CHAT (offline brain) =====
+        server.on("/blaze/chat", HTTP_GET, []() {
+            String json = "[";
+            uint8_t n   = BlazeChat::logCount();
+            for (uint8_t i = 0; i < n; i++) {
+                if (i) json += ",";
+                json += "\"" + String(BlazeChat::logLine(i)) + "\"";
+            }
+            json += "]";
+            server.send(200, str(W_JSON), json);
+        });
+
+        server.on("/blaze/chat", HTTP_POST, []() {
+            DynamicJsonBuffer jsonBuffer;
+            JsonObject& root = jsonBuffer.parseObject(server.arg("plain"));
+            String     reply;
+            if (root.success() && root.containsKey("msg")) {
+                const char* m = root["msg"];
+                if (m) reply = BlazeChat::sendMsg(String(m));
+            }
+            String j = "{\"ok\":";
+            j += reply.length() ? "true" : "false";
+            j += ",\"reply\":\"" + reply + "\"}";
+            server.send(200, str(W_JSON), j);
         });
 
         server.on("/twin", HTTP_GET, []() {

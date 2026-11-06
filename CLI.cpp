@@ -8,6 +8,7 @@
 #include "BlazeRecon.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeCfg.h"
+#include "BlazeChat.h"
 
 /*
    Shitty code used less resources so I will keep this clusterfuck as it is,
@@ -292,6 +293,7 @@ void CLI::runCommand(String input) {
         prntln(CLI_HELP_DRAW);
         prntln(CLI_HELP_SCREEN_ON);
         prntln(CLI_HELP_SCREEN_MODE);
+        prntln(CLI_HELP_BLAZE_CHAT);
 
         prntln(CLI_HELP_FOOTER);
     }
@@ -1293,6 +1295,22 @@ void CLI::runCommand(String input) {
             displayUI.on();
         } else if (eqlsCMD(1, CLI_OFF)) {
             displayUI.off();
+        }
+    }
+
+    // ===== BLAZE CHAT ===== //
+    // blaze chat <message>
+    else if (eqlsCMD(0, CLI_BLAZE) && eqlsCMD(1, CLI_CHAT)) {
+        if (list->size() >= 3) {
+            String msg;
+            for (int i = 2; i < list->size(); i++) {
+                if (i > 2) msg += " ";
+                msg += list->get(i);
+            }
+            prnt("blaze> ");
+            prntln(BlazeChat::sendMsg(msg));
+        } else {
+            prntln(CLI_HELP_BLAZE_CHAT);
         }
     }
 

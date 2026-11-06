@@ -26,6 +26,7 @@ FILES = [
     "login.html",
     "tracker.html",
     "twin.html",
+    "chat.html",
     "style.css",
     "js/ssids.js",
     "js/site.js",
@@ -35,6 +36,7 @@ FILES = [
     "js/blaze.js",
     "js/tracker.js",
     "js/twin.js",
+    "js/chat.js",
     "lang/en.lang",
     "LICENSE",
 ]

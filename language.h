@@ -157,6 +157,8 @@ const char CLI_LINE[] PROGMEM = "line/s,-l";                   // line, lines, -
 const char CLI_COMMENT[] PROGMEM = "//";                       // //
 const char CLI_SCREEN[] PROGMEM = "screen";                    // screen
 const char CLI_MODE[] PROGMEM = "mode,-m";                     // mode
+const char CLI_BLAZE[] PROGMEM = "blaze";                      // blaze
+const char CLI_CHAT[] PROGMEM = "chat";                        // chat
 const char CLI_MODE_BUTTONTEST[] PROGMEM = "buttontest";       // buttontest
 const char CLI_MODE_PACKETMONITOR[] PROGMEM = "packetmonitor"; // packetmonitor
 const char CLI_MODE_LOADINGSCREEN[] PROGMEM = "loadingscreen"; // loading
@@ -209,6 +211,7 @@ const char CLI_HELP_LED_B[] PROGMEM = "led <#rrggbb>";
 const char CLI_HELP_DRAW[] PROGMEM = "draw";
 const char CLI_HELP_SCREEN_ON[] PROGMEM = "screen <on/off>";
 const char CLI_HELP_SCREEN_MODE[] PROGMEM = "screen mode <menu/packetmonitor/buttontest/loading>";
+const char CLI_HELP_BLAZE_CHAT[] PROGMEM = "blaze chat <message> - talk to the companion";
 
 const char CLI_INPUT_PREFIX[] PROGMEM = "# ";
 const char CLI_SERIAL_ENABLED[] PROGMEM = "Serial interface enabled";

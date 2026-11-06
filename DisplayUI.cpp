@@ -6,6 +6,7 @@
 #include "BlazeTracker.h"
 #include "BlazeFx.h"
 #include "BlazePersona.h"
+#include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 
@@ -744,6 +745,8 @@ void DisplayUI::setupButtons() {
             setTime(clockHour, clockMinute + 1, clockSecond);
         } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list up
             if (probeScroll > 0) probeScroll--;
+        } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
+            BlazeChat::move(-1);
         }
     });
 
@@ -764,6 +767,8 @@ void DisplayUI::setupButtons() {
             setTime(clockHour, clockMinute + 10, clockSecond);
         } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list up
             if (probeScroll > 0) probeScroll--;
+        } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
+            BlazeChat::move(-1);
         }
     }, buttonDelay);
 
@@ -795,6 +800,8 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list down
             int maxScroll = BlazeRecon::probeCount() - 1;
             if (probeScroll < maxScroll) probeScroll++;
+        } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
+            BlazeChat::move(1);
         }
     });
 
@@ -816,6 +823,8 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::PROBELOG) {      // scroll probe list down
             int maxScroll = BlazeRecon::probeCount() - 1;
             if (probeScroll < maxScroll) probeScroll++;
+        } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
+            BlazeChat::move(1);
         }
     }, buttonDelay);
 
@@ -844,6 +853,8 @@ void DisplayUI::setupButtons() {
             } else if (held >= 2000 && held < 2900) {
                 BlazeTracker::selectHold(); // fires once per press
             }
+        } else if (mode == DISPLAY_MODE::CHAT) {
+            cycleMode(); // A hold: leave CHAT -> MENU (click sends instead)
         }
     }, 800);
 
@@ -919,10 +930,15 @@ void DisplayUI::setupButtons() {
                 buttonTime = currentTime;
                 break;
 
-            // BLAZE screens: click = next mode (FACE -> MENU -> FACE ...)
+            // BLAZE screens: click = next mode (FACE -> CHAT -> MENU -> FACE ...)
             case DISPLAY_MODE::LOADING:
             case DISPLAY_MODE::BLAZE_FACE:
                 cycleMode();
+                break;
+
+            // CHAT: click = send the highlighted phrase (hold = leave)
+            case DISPLAY_MODE::CHAT:
+                BlazeChat::send();
                 break;
 
             // PANIC: any press returns to the menu
@@ -988,6 +1004,7 @@ void DisplayUI::setupButtons() {
                 // BLAZE screens: B = back to menu
                 case DISPLAY_MODE::LOADING:
                 case DISPLAY_MODE::BLAZE_FACE:
+                case DISPLAY_MODE::CHAT:
                 case DISPLAY_MODE::PANIC:
                     cycleModeToMenu();
                     break;
@@ -1009,7 +1026,11 @@ void DisplayUI::cycleMode() {
             break;
 
         case DISPLAY_MODE::BLAZE_FACE:
-            cycleModeToMenu();
+            mode = DISPLAY_MODE::CHAT; // FACE -> CHAT
+            break;
+
+        case DISPLAY_MODE::CHAT:
+            cycleModeToMenu(); // CHAT -> MENU (A hold or B)
             break;
 
         default: // MENU, CLOCK, PACKETMONITOR, ... -> back to BLAZE face loop
@@ -1216,6 +1237,9 @@ void DisplayUI::draw(bool force) {
                 break;
             case DISPLAY_MODE::BLAZE_FACE:
                 drawBlazeFace();
+                break;
+            case DISPLAY_MODE::CHAT:
+                BlazeChat::render(&display);
                 break;
             case DISPLAY_MODE::TRACKER:
                 if (BlazeTracker::picking()) drawTrackerPick();
