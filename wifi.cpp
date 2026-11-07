@@ -409,7 +409,7 @@ namespace wifi {
             server.send(200, str(W_JSON), json);
         });
 
-        // persona voice log (oldest -> newest)
+        // persona log (oldest -> newest)
         server.on("/blaze/log", HTTP_GET, []() {
             String json = "[";
             uint8_t n   = BlazePersona::logCount();

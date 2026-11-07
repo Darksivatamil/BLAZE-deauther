@@ -19,7 +19,7 @@
 extern Attack attack; // the instance lives in the main sketch
 
 namespace BlazeLoyal {
-    // ===== serial voice (PROGMEM) ===== //
+    // ===== serial output (PROGMEM) ===== //
     const char GUARD_HIT[] PROGMEM     = "[BLAZE] own-net guard: ";
     const char GUARD_REFUSED[] PROGMEM = "[BLAZE] own-net guard - refused.";
 

@@ -179,7 +179,7 @@ void loop() {
     led::update();   // update LED color
     wifi::update();  // manage access point
     attack.update(); // run attacks
-    BlazeCore::update(); // BLAZE: sound + face state machines
+    BlazeCore::update(); // BLAZE: persona + face state machines
     displayUI.update();
     cli.update();    // read and run serial input
     scan.update();   // run scan

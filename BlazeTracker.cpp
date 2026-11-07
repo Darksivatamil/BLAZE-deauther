@@ -323,7 +323,7 @@ namespace BlazeTracker {
             }
         }
 
-        // ---- distance indicator (visual only, no audio) ---- //
+        // ---- distance indicator (visual only) ---- //
         // cadence is driven by the OLED gauge; nothing to tick here
     }
 

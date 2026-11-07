@@ -178,7 +178,7 @@ namespace BlazeChat {
         logPush("you> " + msg);
         logPush("blaze> " + rep);
 
-        prnt("[CHAT] "); // serial voice
+        prnt("[CHAT] "); // serial line
         prnt(msg);
         prnt(" -> ");
         prntln(rep);

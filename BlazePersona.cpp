@@ -57,7 +57,7 @@ namespace BlazePersona {
         { "nothing to eat. yet.",  "still here. obviously." } // EV_BANTER
     };
 
-    // ===== voice log ring buffer (for /blaze/log) ===== //
+    // ===== persona log ring buffer (for /blaze/log) ===== //
     static const uint8_t LOG_N = 16;
     static String    logBuf[LOG_N];
     static uint8_t   logHead = 0; // next slot to write
@@ -217,9 +217,9 @@ namespace BlazePersona {
         evLast[e] = now;
 
         String line = linePick(e);
-        prnt("[BLAZE] "); // serial voice
+        prnt("[BLAZE] "); // serial line
         prntln(line);
         logPush(line);
-        flash(line, 2000); // OLED voice (skipped when display off / panic / booting)
+        flash(line, 2000); // OLED flash (skipped when display off / panic / booting)
     }
 }

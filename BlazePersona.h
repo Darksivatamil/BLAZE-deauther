@@ -1,8 +1,8 @@
 /* BLAZE - Team DARK
    Persona engine - stance machine + offline companion lines.
    Replaces the old BlazeMood "mood" states with bold stances and
-   drives the text-only voice (OLED flash / serial / web log).
-   No AI uplink, no sound - text only (see UPGRADE_PLAN.md). */
+   drives the text-only persona output (OLED flash / serial / web log).
+   No AI uplink - text only (see UPGRADE_PLAN.md). */
 
 #pragma once
 

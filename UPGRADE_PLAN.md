@@ -9,7 +9,7 @@ Baseline: commit `097ac2f` (working tree clean, build green)
 2. **Face: KEPT** — eyes survive, redrawn angular/crosshair; same 26 reaction
    indices, `face.weights` CSV stays valid.
 3. **Sound: REMOVED permanently** — no `BlazeSound`, no riffs, `BLAZE_SOUND_PIN`
-   deleted from `A_config.h`. Voice = text only (OLED/web/CLI).
+   deleted from `A_config.h`. Persona output = text only (OLED/web/CLI).
 
 ---
 
@@ -23,7 +23,7 @@ partner riding shotgun**:
 - **The companion** — a personality that talks to you while you work: narrates what
   it sees, celebrates catches, warns you, roasts you, refuses dumb orders.
 
-### Voice bible (applies to EVERY new string, OLED/web/CLI)
+### Tone bible (applies to EVERY new string, OLED/web/CLI)
 
 | Trait | Means | Example |
 |---|---|---|
@@ -37,7 +37,7 @@ Rules of thumb:
 - Lowercase for taunts, UPPERCASE for alerts (`INTRUDER` vs `still here.`).
 - Never cute-sad: disappointment is flat, not tearful.
 - Evil Twin portal copy is **exempt** — it must stay believable to victims.
-  Rudeness is BLAZE's voice *to us*, not to the mark.
+  Rudeness is BLAZE's tone *to us*, not to the mark.
 
 ---
 
@@ -97,7 +97,7 @@ reaction weights, flash messages, FX API) survives, so risk stays low.
 
 Text-only companion: **no sound module, no AI uplink** (both dropped by decision).
 
-### 2.1 `BlazePersona` — the voice (new `BlazePersona.cpp/.h`)
+### 2.1 `BlazePersona` — the tone (new `BlazePersona.cpp/.h`)
 - **Stance engine**: reworks `BlazeMood`'s 6 states → `IDLE / PROWL / HUNGRY /
   UNIMPRESSED / LOCKED / STANDBY`. Same triggers (attack start/stop, scan done,
   alert), same bias feed into `BlazeFace::setMoodBias()` — but renamed + rude.
@@ -150,10 +150,10 @@ Text-only companion: **no sound module, no AI uplink** (both dropped by decision
 |---|---|---|---|
 | **0** | Cleanup | Delete dead config (`BLAZE_AI_*`, `BLAZE_UPLINK_*`, `BLAZE_SOUND_PIN`) from `A_config.h` | build green; no dangling refs |
 | **1** | Persona + de-cute | `BlazePersona` (rework BlazeMood→stances), line tables, all §1.3 renames/redraws, confetti→GLITCH, greet audit | grep audit: no banned strings left; `face.weights` CSV still loads; build green |
-| **2** | CHAT mode | `DISPLAY_MODE::CHAT`, canned wheel, offline brain, `/blaze/chat` + `/blaze/log`, `chat.html`, CLI `blaze chat` | FACE→CHAT→MENU cycle works; web msg appears on OLED; offline replies in voice |
+| **2** | CHAT mode | `DISPLAY_MODE::CHAT`, canned wheel, offline brain, `/blaze/chat` + `/blaze/log`, `chat.html`, CLI `blaze chat` | FACE→CHAT→MENU cycle works; web msg appears on OLED; offline replies in tone |
 | **3** | Loyalty | OwnNetGuard + IntruderAlert | own-SSID attack refused; home-SSID probe triggers INTRUDER once/30 s |
 | **4** | Polish | web login copy, CLI banner, LED↔stance sync (`led.h`), tracker/vuln copy pass | tone consistent across OLED/web/CLI/LED |
-| **5** | Ship | `USAGE_GUIDE.md` (rewritten in voice), flash + serial verification sequence | guide complete; on-device checklist run when board available |
+| **5** | Ship | `USAGE_GUIDE.md` (rewritten in tone), flash + serial verification sequence | guide complete; on-device checklist run when board available |
 
 ### Hard rules (every phase)
 1. **No new `IRAM_ATTR`** — IRAM is at 93 % (61035/65536). New code lives in flash.
@@ -186,7 +186,7 @@ Comfortable headroom — no TLS, no sound, no new libraries.
 ## 5. Pending work carried over from the stop
 
 1. **`USAGE_GUIDE.md`** — was halted mid-write; rewritten in Phase 5 in the new
-   voice (setup, buttons, panic, all features, companion usage, authorized-testing
+   tone (setup, buttons, panic, all features, companion usage, authorized-testing
    notice).
 2. **Flash + serial verification** — blocked on hardware (no `/dev/ttyUSB*`,
    `arduino-cli board list` empty). Sequence when board is plugged in:
@@ -207,4 +207,4 @@ Comfortable headroom — no TLS, no sound, no new libraries.
 |---|---|
 | AI uplink (NIM) | **DROPPED** — dead config deleted; offline brain only; no HTTPClient/BearSSL in the project |
 | Face | **KEPT** — eyes redrawn angular/crosshair; 26 reaction indices unchanged, `face.weights` CSV valid |
-| Sound | **REMOVED permanently** — no sound module; `BLAZE_SOUND_PIN` deleted; voice is text-only |
+| Sound | **REMOVED permanently** — no sound module; `BLAZE_SOUND_PIN` deleted; persona output is text-only |

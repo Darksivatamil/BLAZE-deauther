@@ -69,7 +69,7 @@
 #define BUTTON_MODE 0 // D3 (GPIO0) - REMOVED from UI (unused), only kept pulled up
 
 // ===== BLAZE COMPANION (offline only) ===== //
-// no AI uplink, no sound — text-only persona (see UPGRADE_PLAN.md)
+// no AI uplink — text-only persona (see UPGRADE_PLAN.md)
 #define BLAZE_HOME_SSID "" // home/owned network - protected by OwnNetGuard + IntruderAlert
 
 // https://github.com/spacehuhntech/hackheld
