@@ -8,6 +8,7 @@
 #include "settings.h" // used in update()
 #include "Attack.h"   // used in update()
 #include "Scan.h"     // used in update()
+#include "BlazePersona.h"
 
 // Inlcude libraries for Neopixel or LED_MY92xx if used
 #if defined(LED_NEOPIXEL)
@@ -24,6 +25,7 @@ extern Scan   scan;
 namespace led {
     // ===== PRIVATE ===== //
     LED_MODE mode = OFF;
+    uint8_t lastStance = 255; // 255 = stance color not applied (invalidate)
 
 #if defined(LED_NEOPIXEL_RGB)
     Adafruit_NeoPixel strip { LED_NUM, LED_NEOPIXEL_PIN, NEO_RGB + NEO_KHZ800 };
@@ -100,6 +102,18 @@ namespace led {
 #endif // if defined(LED_DIGITAL) || defined(LED_RGB)
     }
 
+    // stance sync (plan phase 4): when no scan/attack drives the LED, it speaks the stance
+    static void stanceColor() {
+        switch (BlazePersona::get()) {
+            case BlazePersona::ST_HUNGRY:      setColor(255, 0, 0);    break; // feeding: red
+            case BlazePersona::ST_LOCKED:      setColor(0, 255, 255);  break; // jackpot: cyan
+            case BlazePersona::ST_PROWL:       setColor(70, 0, 255);   break; // hunting: violet
+            case BlazePersona::ST_UNIMPRESSED: setColor(255, 90, 0);   break; // burnt: amber
+            case BlazePersona::ST_STANDBY:     setColor(0, 0, 0);      break; // screen off: dark
+            default:                          setColor(LED_MODE_IDLE); break; // calm: base green
+        }
+    }
+
     void update() {
         if (!settings::getLEDSettings().enabled) {
             setMode(OFF);
@@ -110,11 +124,23 @@ namespace led {
         } else {
             setMode(IDLE);
         }
+
+        // stance sync: only IDLE mode yields the LED to the persona
+        if (mode == IDLE) {
+            uint8_t s = (uint8_t)BlazePersona::get();
+            if (s != lastStance) {
+                lastStance = s;
+                stanceColor();
+            }
+        } else {
+            lastStance = 255; // scan/attack/off own the LED - re-apply on return
+        }
     }
 
     void setMode(LED_MODE new_mode, bool force) {
         if ((new_mode != mode) || force) {
             mode = new_mode;
+            lastStance = 255; // any mode (re)write invalidates the stance color
 
             switch (mode) {
                 case OFF:

@@ -15,6 +15,7 @@ namespace BlazePersona {
     static uint32_t stanceAt   = 0;   // when current stance began
     static uint32_t holdUntil  = 0;   // elevated stance expires after this
     static int8_t   curBias    = 0;   // pushed into BlazeFace
+    static uint32_t banterAt = 0;   // next idle-banter due time (plan 2.1)
 
     // ===== line cooldowns (per event, ms) ===== //
     static const uint32_t EV_COOLDOWN[EV_COUNT] = {
@@ -31,7 +32,8 @@ namespace BlazePersona {
         6000,   // EV_KILL
         0,      // EV_PANIC - always
         5000,   // EV_HOUSE
-        30000   // EV_INTRUDER - matches the watchdog cooldown
+        30000,  // EV_INTRUDER - matches the watchdog cooldown
+        0       // EV_BANTER - the idle timer is the gate
     };
     static uint32_t evLast[EV_COUNT];
 
@@ -51,7 +53,8 @@ namespace BlazePersona {
         { "kill mode.",            "burn it down." },       // EV_KILL
         { "hands off the keyboard.", "everyone down." },    // EV_PANIC
         { "that's my house. no.",  "not your network. mine." }, // EV_HOUSE
-        { "someone's touching MY network.", "intruder. my turf." } // EV_INTRUDER
+        { "someone's touching MY network.", "intruder. my turf." }, // EV_INTRUDER
+        { "nothing to eat. yet.",  "still here. obviously." } // EV_BANTER
     };
 
     // ===== voice log ring buffer (for /blaze/log) ===== //
@@ -107,9 +110,22 @@ namespace BlazePersona {
         logHead   = 0;
         logNum    = 0;
         for (uint8_t i = 0; i < EV_COUNT; i++) evLast[i] = 0;
+        banterAt = millis() + 60000 + (uint32_t)random(60001); // first line in 60-120 s
     }
 
     void update() {
+        // idle banter (plan 2.1): a calm minute buys a one-liner - never during
+        // boot, screen-off, CHAT (don't yank the typist out) or PANIC
+        // (panic cancels persona banter - hard rule 4)
+        if ((int32_t)(millis() - banterAt) >= 0) {
+            banterAt = millis() + 60000 + (uint32_t)random(60001); // roll 60-120 s
+            if ((stance == ST_IDLE) && BlazeFace::bootDone() &&
+                !displayUI.asleep() && (displayUI.mode != DISPLAY_MODE::PANIC) &&
+                (displayUI.mode != DISPLAY_MODE::CHAT)) {
+                onEvent(EV_BANTER);
+            }
+        }
+
         if (stance == ST_IDLE || stance == ST_STANDBY) return;
         if (!holdUntil) return;
         if ((int32_t)(millis() - holdUntil) < 0) return; // still holding

@@ -214,8 +214,8 @@ const char CLI_HELP_SCREEN_MODE[] PROGMEM = "screen mode <menu/packetmonitor/but
 const char CLI_HELP_BLAZE_CHAT[] PROGMEM = "blaze chat <message> - talk to the companion";
 
 const char CLI_INPUT_PREFIX[] PROGMEM = "# ";
-const char CLI_SERIAL_ENABLED[] PROGMEM = "Serial interface enabled";
-const char CLI_SERIAL_DISABLED[] PROGMEM = "Serial interface disabled";
+const char CLI_SERIAL_ENABLED[] PROGMEM = "serial up. 'help' if you're lost.";
+const char CLI_SERIAL_DISABLED[] PROGMEM = "serial off. buttons still work.";
 const char CLI_ERROR[] PROGMEM = "ERROR: ";
 const char CLI_ERROR_PARAMETER[] PROGMEM = "Error Invalid parameter \"";
 const char CLI_STOPPED_SCRIPT[] PROGMEM = "Cleared CLI command queue";
@@ -223,8 +223,8 @@ const char CLI_CONTINUOUSLY[] PROGMEM = "continuously";
 const char CLI_EXECUTING[] PROGMEM = "Executing ";
 const char CLI_SCRIPT_DONE_CONTINUE[] PROGMEM = "Done executing script - type 'stop script' to end the continuous mode";
 const char CLI_SCRIPT_DONE[] PROGMEM = "Done executing script";
-const char CLI_HELP_HEADER[] PROGMEM = "[===== List of commands =====]";
-const char CLI_HELP_FOOTER[] PROGMEM = "========================================================================\r\nfor more information please visit github.com/spacehuhn/esp8266_deauther\r\n========================================================================";
+const char CLI_HELP_HEADER[] PROGMEM = "[===== BLAZE commands - read them =====]";
+const char CLI_HELP_FOOTER[] PROGMEM = "========================================================================\r\nstuck? the manual: github.com/spacehuhn/esp8266_deauther\r\n========================================================================";
 const char CLI_ERROR_NAME_LEN[] PROGMEM = "ERROR : Name length 0";
 const char CLI_ERROR_MAC_LEN[] PROGMEM = "ERROR : MAC length 0";
 const char CLI_RICE_START[] PROGMEM = "Starting rice debugger (auto - repair mode enabled), please stand by...\r\nKeep the device connected to a power supply until the debugger ends\r\nYOU RISK TO BRICK THE BOARD!!!";

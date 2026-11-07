@@ -35,6 +35,7 @@ namespace BlazePersona {
         EV_PANIC,          // global kill switch fired
         EV_HOUSE,          // OwnNetGuard refused a target (loyalty)
         EV_INTRUDER,       // home SSID probed/cloned (IntruderAlert)
+        EV_BANTER,         // idle one-liner (60-120 s random, plan 2.1)
         EV_COUNT
     };
 

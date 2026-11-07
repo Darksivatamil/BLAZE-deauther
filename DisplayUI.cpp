@@ -1400,7 +1400,7 @@ void DisplayUI::drawTracker() {
                 prevY = y;
             }
         } else {
-            drawString(3, center("waiting for signal", maxLen));
+            drawString(3, center("no signal. move.", maxLen));
         }
     }
 
@@ -1481,7 +1481,7 @@ void DisplayUI::drawVuln() {
         drawString(2, center("worst:", maxLen));
         drawString(3, center(ssid, maxLen));
     } else {
-        drawString(2, center("no APs scanned", maxLen));
+        drawString(2, center("no APs. scan now.", maxLen));
     }
 
     drawString(4, center("B = back", maxLen));

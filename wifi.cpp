@@ -403,7 +403,9 @@ namespace wifi {
             json += BlazeTracker::active() ? "true" : "false";
             uint8_t ln = BlazePersona::logCount();
             json += ",\"stance\":\"" + String(BlazePersona::stanceName()) + "\"";
-            json += ",\"line\":\"" + String(ln ? BlazePersona::logLine(ln - 1) : "--") + "\"}";
+            json += ",\"line\":\"" + String(ln ? BlazePersona::logLine(ln - 1) : "--") + "\"";
+            json += ",\"uptime\":" + String((uint32_t)(millis() / 1000));
+            json += "}";
             server.send(200, str(W_JSON), json);
         });
 
