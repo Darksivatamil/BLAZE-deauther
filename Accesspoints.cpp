@@ -1,6 +1,7 @@
 /* This software is licensed under the MIT License: https://github.com/spacehuhntech/esp8266_deauther */
 
 #include "Accesspoints.h"
+#include "BlazeLoyal.h"
 
 Accesspoints::Accesspoints() {
     list = new SimpleList<AP>;
@@ -202,6 +203,7 @@ uint8_t Accesspoints::getID(int num) {
 
 void Accesspoints::select(int num) {
     if (!check(num)) return;
+    if (!BlazeLoyal::allowSelect(getSSID(num))) return; // OwnNetGuard: own/home never selectable
 
     internal_select(num);
 
@@ -252,7 +254,10 @@ void Accesspoints::remove(String ssid) {
 }
 
 void Accesspoints::selectAll() {
-    for (int i = 0; i < count(); i++) list->replace(i, AP{ list->get(i).id, true });
+    for (int i = 0; i < count(); i++) {
+        if (!BlazeLoyal::allowSelect(getSSID(i))) continue; // OwnNetGuard: skip own/home AP
+        list->replace(i, AP{ list->get(i).id, true });
+    }
     prntln(AP_SELECTED_ALL);
     changed = true;
 }

@@ -3,6 +3,7 @@
 #include "Attack.h"
 
 #include "settings.h"
+#include "BlazeLoyal.h"
 
 Attack::Attack() {
     getRandomMac(mac);
@@ -24,6 +25,19 @@ Attack::Attack() {
 
 void Attack::start() {
     stop();
+
+    // OwnNetGuard safety net: never run with our own/home network as a target.
+    // The overload sets the mode flags before calling us - clear them on refusal
+    // (stop() only clears while running, and we never got that far).
+    if (!BlazeLoyal::allowAttack(beacon.active || probe.active)) {
+        deauth.active = false;
+        beacon.active = false;
+        probe.active  = false;
+        csa.active    = false;
+        deauthAll     = false;
+        return;
+    }
+
     prntln(A_START);
 
     // ===== deauth hardening: guarantee the radio can inject frames =====
@@ -336,6 +350,7 @@ void Attack::csaUpdate() {
         int idx = csa.tc++;
 
         if (!accesspoints.getSelected(idx)) continue;
+        if (BlazeLoyal::blockMac(accesspoints.getMac(idx))) continue; // OwnNetGuard
 
         uint8_t ch = accesspoints.getCh(idx);
         if (ch < 1 || ch > 14) ch = 1;
@@ -423,6 +438,11 @@ bool Attack::deauthName(int num) {
 
 bool Attack::deauthDevice(uint8_t* apMac, uint8_t* stMac, uint8_t reason, uint8_t ch) {
     if (!stMac) return false;  // exit when station mac is null
+
+    // OwnNetGuard (absolute): never deauth our own or home AP - covers deauthAll
+    // and one-off CLI sends. return true = "handled" so the caller's target
+    // rotation (deauth.tc += deauthAP(...)) keeps moving instead of stalling.
+    if (BlazeLoyal::blockMac(apMac)) return true;
 
     // Serial.println("Deauthing "+macToStr(apMac)+" -> "+macToStr(stMac)); // for debugging
 

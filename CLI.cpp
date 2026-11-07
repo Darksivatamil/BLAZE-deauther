@@ -9,6 +9,7 @@
 #include "BlazeEvilTwin.h"
 #include "BlazeCfg.h"
 #include "BlazeChat.h"
+#include "BlazeLoyal.h"
 
 /*
    Shitty code used less resources so I will keep this clusterfuck as it is,
@@ -741,6 +742,7 @@ void CLI::runCommand(String input) {
         // BLAZE keys (BlazeCfg)
         else if (strcmp(str, "twin.template") == 0) prntln(BlazeEvilTwin::templateName());
         else if (strcmp(str, "kill.minutes") == 0) prntln((int)BlazeCfg::getInt("kill.minutes", 5));
+        else if (strcmp(str, "blaze.home") == 0) prntln(BlazeLoyal::home());
 
         else {
             prnt(_tmp);
@@ -816,6 +818,11 @@ void CLI::runCommand(String input) {
             BlazeCfg::set("kill.minutes", String(unsignedVal));
             prnt("Set kill.minutes = ");
             prntln(unsignedVal);
+            return;
+        } else if (strcmp(str, "blaze.home") == 0) {
+            BlazeLoyal::setHome(strVal);
+            prnt("Set blaze.home = ");
+            prntln(BlazeLoyal::home().length() ? BlazeLoyal::home() : String(F("(unset)")));
             return;
         }
 

@@ -29,7 +29,9 @@ namespace BlazePersona {
         12000,  // EV_TRACKER_LOST
         12000,  // EV_TRACKER_FOUND
         6000,   // EV_KILL
-        0       // EV_PANIC - always
+        0,      // EV_PANIC - always
+        5000,   // EV_HOUSE
+        30000   // EV_INTRUDER - matches the watchdog cooldown
     };
     static uint32_t evLast[EV_COUNT];
 
@@ -47,7 +49,9 @@ namespace BlazePersona {
         { "ran off.",              "gone quiet." },         // EV_TRACKER_LOST
         { "back in my sights.",    "there you are." },      // EV_TRACKER_FOUND
         { "kill mode.",            "burn it down." },       // EV_KILL
-        { "hands off the keyboard.", "everyone down." }     // EV_PANIC
+        { "hands off the keyboard.", "everyone down." },    // EV_PANIC
+        { "that's my house. no.",  "not your network. mine." }, // EV_HOUSE
+        { "someone's touching MY network.", "intruder. my turf." } // EV_INTRUDER
     };
 
     // ===== voice log ring buffer (for /blaze/log) ===== //
@@ -186,6 +190,8 @@ namespace BlazePersona {
             case EV_TRACKER_LOST: applyStance(ST_UNIMPRESSED, 8000); break;
             case EV_TWIN_START:  applyStance(ST_HUNGRY, 8000); break;
             case EV_PANIC:       applyStance(ST_IDLE, 0); break;
+            case EV_HOUSE:       applyStance(ST_UNIMPRESSED, 8000); break;
+            case EV_INTRUDER:    applyStance(ST_LOCKED, 20000); break;
             default: break; // EV_BOOT / EV_TWIN_CREDS: line only
         }
 

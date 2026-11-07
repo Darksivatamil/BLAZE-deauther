@@ -17,6 +17,7 @@
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "BlazeCfg.h"
+#include "BlazeLoyal.h"
 
 extern Attack attack;
 extern Scan   scan;
@@ -38,6 +39,7 @@ namespace BlazeCore {
         BlazeChat::setup();
         BlazeEvilTwin::setup();
         BlazeRecon::setup();
+        BlazeLoyal::setup(); // OwnNetGuard + IntruderAlert (plan 2.3)
         BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)
 
         if (settings::getDisplaySettings().enabled) {
@@ -53,6 +55,7 @@ namespace BlazeCore {
         BlazePersona::update();
         BlazeEvilTwin::update();
         BlazeRecon::update(); // pcap flush + EAPOL capture phase machine
+        BlazeLoyal::update(); // loyalty watchdogs (own-net sweep + intruder alert)
 
         // boot animation finished -> companion says hello (once)
         if (!bootLogged && BlazeFace::bootDone()) {

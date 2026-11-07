@@ -1,6 +1,7 @@
 /* This software is licensed under the MIT License: https://github.com/spacehuhntech/esp8266_deauther */
 
 #include "Stations.h"
+#include "BlazeLoyal.h"
 
 Stations::Stations() {
     list = new SimpleList<Station>();
@@ -239,6 +240,7 @@ uint8_t Stations::getCh(int num) {
 
 void Stations::select(int num) {
     if (!check(num)) return;
+    if (!BlazeLoyal::allowSelect(getAPStr(num))) return; // OwnNetGuard: home-network stations excluded
 
     internal_select(num);
     prnt(ST_SELECTED_STATION);
@@ -266,6 +268,7 @@ void Stations::remove(int num) {
 }
 
 void Stations::select(String ssid) {
+    if (!BlazeLoyal::allowSelect(ssid)) return; // OwnNetGuard: one refusal, not one per station
     for (int i = 0; i < list->size(); i++) {
         if (getAPStr(i).equalsIgnoreCase(ssid)) select(i);
     }
@@ -284,7 +287,10 @@ void Stations::remove(String ssid) {
 }
 
 void Stations::selectAll() {
-    for (int i = 0; i < count(); i++) internal_select(i);
+    for (int i = 0; i < count(); i++) {
+        if (!BlazeLoyal::allowSelect(getAPStr(i))) continue; // OwnNetGuard: skip home-network stations
+        internal_select(i);
+    }
     prntln(ST_SELECTED_ALL);
     changed = true;
 }
