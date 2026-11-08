@@ -48,22 +48,22 @@ arduino-cli upload -p /dev/ttyUSB0 --fqbn esp8266:esp8266:nodemcuv2 \
 
 | control | click | hold |
 |---|---|---|
-| UP | menu cursor up · tracker pick up · packet monitor channel +1 · clock minute +1 · probe log scroll · previous chat phrase | repeat (clock hold = +10 min) |
+| UP | menu cursor up · tracker pick up · packet monitor channel +1 · clock minute +1 · probe log scroll · detector findings scroll · previous chat phrase | repeat (clock hold = +10 min) |
 | DOWN | the mirror of UP | repeat (clock hold = −10 min) |
-| A | activate menu item · send chat phrase · confirm tracker pick · save calibration · leave scan / packet monitor / twin / probe log / vuln / clock / PANIC | 800 ms = the item's hold action (list rows open the detail screen); in CHAT = back to MENU; in TRACKER ≥2 s = enter/leave calibration or cancel a pick |
+| A | activate menu item · send chat phrase · confirm tracker pick · save calibration · leave scan / packet monitor / twin / detector / probe log / vuln / clock / PANIC | 800 ms = the item's hold action (list rows open the detail screen); in CHAT = back to MENU; in TRACKER ≥2 s = enter/leave calibration or cancel a pick; in DETECTOR = prove the selected finding with an active probe |
 
 - **mode cycle**: boot loading → FACE. main-menu item `MODE FACE` → FACE.
   A click on FACE → CHAT. A hold in CHAT → MENU.
 - **child menus**: `[BACK]` is the first item, cursor starts on the second. click it.
 - screens that print `B = back` are quoting a button you do not have. A does it.
 - the display blanks after `displayTimeout` seconds (default 600) — but never on the
-  face, tracker, twin, loading or PANIC screens. any press wakes it; a click also acts
+  face, tracker, twin, detector, loading or PANIC screens. any press wakes it; a click also acts
   in the same press, an A-hold on a dark screen only wakes (click first, then hold).
 
 ## PANIC — HOLD UP + DOWN, 1.5 SECONDS
 
 works on any screen, always. stops the attack, the scan, EAPOL capture, the tracker,
-the evil twin and kick-and-lure. shows `PANIC / ALL STOPPED` for 2.5 s, then back to
+the evil twin, the detector cycle and kick-and-lure. shows `PANIC / ALL STOPPED` for 2.5 s, then back to
 the main menu (an **A** click dismisses it early — UP/DOWN only wake it). the
 companion says `hands off the keyboard.` and keeps quiet on that screen.
 
@@ -72,8 +72,8 @@ companion says `hands off the keyboard.` and keeps quiet on that screen.
 ## FEATURES
 
 main menu, in order:
-`SCAN` · `MODE FACE` · `TARGETS` · `ATTACK` · `PACKET MONITOR` · `TRACKER` ·
-`EVIL TWIN` · `TWIN <style>` · `WEIGHTS` · `RAIN ON/OFF` · `CLOCK`
+`SCAN` · `MODE FACE` · `TARGETS` · `ATTACK` · `PACKET MONITOR` · `DETECTOR` ·
+`TRACKER` · `EVIL TWIN` · `TWIN <style>` · `WEIGHTS` · `RAIN ON/OFF` · `CLOCK`
 
 ### SCAN
 `SCAN AP + ST` (15 s) · `SCAN APs` · `SCAN Stations` (30 s) · `PROBES <n>` · `VULN <score>`.
@@ -104,19 +104,44 @@ generated beacon names every 10 s from the menu, or on an interval from the CLI.
   then `REC <n>`; the total stays on the row when idle. file: `/eapol.pcap` (DLT 105).
 
 ### EVIL TWIN / TWIN <style>
-`EVIL TWIN` clones the first selected AP (else AP 0) as an open network with a
-captive portal. screen: target ssid, `TRIES`, `waiting for victim` /
-`trying password...` / `GOT: <pw>`, `SELECT = STOP`.
-submitted passwords are checked against the real AP (`WiFi.begin`, ~15 s budget
-each). 5-minute hard timeout, then it stops itself.
-`TWIN <style>` cycles the portal: `matrix` → `router` → `venue`
-(or `set twin.template 0|1|2`). a `/portal.html` in LittleFS (under 12000 bytes,
-`%SSID%` placeholder) overrides all three. portal copy stays believable — that is
-the point of it.
+`EVIL TWIN` runs the whole workflow in one press: it clones the first selected
+AP (else AP 0) as an open network, brings the twin up **and** starts a timed
+deauth kick so clients get pushed off the real AP onto the clone. no scan yet →
+`scan first.` flash; protected/hidden/already-running target → `twin refused.`
+it never fails silently. screen: target ssid, `TRIES`, `waiting for victim` /
+`trying password...`, and once a submission lands `GOT: <email>` + `PW: <pw>`,
+`SELECT = STOP` — leaving the screen stops the twin **and** the kick.
+`TWIN <style>` cycles the portal: `matrix` → `router` → `venue` → `google`
+(default; or `set twin.template 0|1|2|3`). the google template is a sign-in
+page that captures **email + password immediately** — account creds are not a
+wifi key, so there is no `WiFi.begin` validation and the twin keeps running.
+the wifi templates keep the async check against the real AP (~15 s each).
+web: `/twin.json` reports `user` + `password` live. a `/portal.html` in
+LittleFS (under 12000 bytes, `%SSID%` placeholder) overrides all four.
+5-minute hard timeout, then it stops itself. OwnNetGuard: your own/home
+SSID is refused — `that's my house. no.`
 
 ### PACKET MONITOR
 sniffer graph. header: channel, deauth count in brackets, packet rate. UP/DOWN
 change channel. **A** stops it and returns.
+
+### DETECTOR
+hunts other deauthers and fake beacons. one cycle: AP scan → 10 s sniff on a
+channel hop → analysis. every verdict is measured evidence, graded
+`-` INFO (a fact) · `!` LIKELY (a measured anomaly) · `*` CONFIRMED (measured
+attack behavior). checks: deauth/disassoc floods (≥5/10 s per source; a source
+that is not in the scan = a spoofed radio), beacon spam against the spec's
+~10/s, one MAC advertising many SSIDs, beacons claiming a different channel
+than the one they were heard on, and one SSID sitting on two BSSIDs (mixed
+encryption or a random MAC = likely clone). while it runs the screen shows the
+phase; afterwards the findings window (UP/DOWN scroll), the selected
+finding's evidence line, `UP/DN B=back`. **A** stops an early run and returns;
+findings from a finished run stay until the next cycle (re-enter `DETECTOR`
+from the menu to re-run). **A-hold** = prove a `DUP` finding: a directed probe
+on both of its channels counting the radios that answer — 2+ answering with
+mixed security (open vs wpa2) = CONFIRMED. own/home SSIDs are never probed.
+stated limits: one radio hears one channel at a time, and a deauther that
+goes quiet outside the 10 s window is invisible to it.
 
 ### TRACKER
 `TRACKER` opens `PICK TARGET` — but only with APs in the list, so run a scan first.
@@ -199,7 +224,7 @@ the UI changes it. fit an `RTC_DS3231` if you actually care what time it is.
 
 ## WEB UI
 
-nav: `SCAN` `SSIDs` `ATTACK` `CHAT` `TRACK` `TWIN` `SETTINGS` `INFO`.
+nav: `SCAN` `SSIDs` `ATTACK` `CHAT` `TRACK` `TWIN` `DETECT` `SETTINGS` `INFO`.
 login `BLAZE` / `&bl@ze1234s678`; wrong password gets `not even close.` on the
 login page — the face stays out of it. `POST /blaze/loginfail` exists server-side
 and would fire `wrong door.`, but no shipped page ever calls it. dashboard footers
@@ -212,7 +237,8 @@ GET  /blaze/log       persona log (oldest → newest)
 GET  /blaze/chat      chat log      POST /blaze/chat {"msg":"..."}
 GET  /blaze/tracker   live tracker state   POST /blaze/track {on,target,env,txp,...}
 GET  /report.json     /report.csv   vulnerability report
-GET  /twin  /twin.json  /attack.json
+GET  /twin  /twin.json  /detect  /detect.json  /attack.json
+GET  /detect?cmd=start|stop|clear|confirm&i=<idx>
 GET  /run?cmd=...     run any CLI command
 ```
 
@@ -233,6 +259,7 @@ attack [beacon] [deauth] [deauthall] [probe] [csa] [nooutput] [-t <timeout>]
 attack status [<on/off>]
 stop <all/scan/attack/script>
 report [json/csv]
+detect [start/stop/status/clear/confirm <idx>]
 get <setting>            set <setting> <value>
 blaze chat <message>
 add ssid <ssid> [-wpa2] [-cl <clones>]
@@ -265,7 +292,7 @@ webinterface / captivePortal / webSpiffs / lang
 serial / serialEcho                                             CLI on the serial port
 led / display / displayTimeout              LED, display, blanking (seconds)
 autosave / autosavetime
-twin.template      0 matrix | 1 router | 2 venue     (BLAZE key)
+twin.template      0 matrix | 1 router | 2 venue | 3 google (default)   (BLAZE key)
 kill.minutes       KILL auto-stop, min 1, default 5  (BLAZE key)
 blaze.home         the network BLAZE protects        (BLAZE key)
 ```

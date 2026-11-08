@@ -955,15 +955,12 @@ void DisplayUI::setupButtons() {
                 buttonTime = currentTime;
                 break;
 
-            // detector: SELECT stops the run / restarts it when idle
+            // detector: SELECT = stop an early run, then back to menu
+            // (same one-press contract as twin/probe log - this board has no B button)
             case DISPLAY_MODE::DETECT:
-                if (BlazeDetector::running() || BlazeDetector::confirming()) {
-                    BlazeDetector::stop();
-                } else if (BlazeDetector::start()) {
-                    detectSel = 0;
-                } else {
-                    flashMsg(String(F("air busy.")), 1500);
-                }
+                if (BlazeDetector::running() || BlazeDetector::confirming()) BlazeDetector::stop();
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
                 buttonTime = currentTime;
                 break;
 
@@ -1562,23 +1559,23 @@ void DisplayUI::drawDetect() {
     if (n <= 0) {
         drawString(1, center("clean air.", maxLen));
         drawString(2, center("nothing heard", maxLen));
-        drawString(3, center("SELECT = scan", maxLen));
-        drawString(4, center("no targets", maxLen));
+        drawString(3, "");
+        drawString(4, center("B = back", maxLen));
         return;
     }
 
-    // idle + findings: 3-line window around the selection
+    // idle + findings: 2-line window + evidence + footer hint (rows drawn once)
     if (detectSel > n - 1) detectSel = n - 1;
     if (detectSel < 0) detectSel = 0;
 
     int scroll = 0;
-    if (n > 3) {
+    if (n > 2) {
         scroll = detectSel - 1;
-        if (scroll > n - 3) scroll = n - 3;
+        if (scroll > n - 2) scroll = n - 2;
         if (scroll < 0) scroll = 0;
     }
 
-    for (int k = 0; k < 3; k++) {
+    for (int k = 0; k < 2; k++) {
         int    i = scroll + k;
         String line;
         if (i < n) {
@@ -1588,10 +1585,12 @@ void DisplayUI::drawDetect() {
         drawString(1 + k, line);
     }
 
-    // row 4: measured evidence behind the selected verdict (always shown)
+    // row 3: measured evidence behind the selected verdict (always shown)
     String detail = BlazeDetector::findingDetail(detectSel);
     if (detail.length() > maxLen) detail = detail.substring(0, maxLen);
-    drawString(4, detail);
+    drawString(3, detail);
+
+    drawString(4, center("UP/DN B=back", maxLen));
 }
 
 // ===== BLAZE: probe-request log screen (plan 4.5) ===== //
