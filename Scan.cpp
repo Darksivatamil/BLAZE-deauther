@@ -5,6 +5,7 @@
 #include "settings.h"
 #include "wifi.h"
 #include "BlazeRecon.h"
+#include "BlazeDetector.h"
 
 Scan::Scan() {
     list = new SimpleList<uint16_t>;
@@ -19,6 +20,9 @@ void Scan::sniffer(uint8_t* buf, uint16_t len) {
 
     // BLAZE recon (plan 4.4/4.5): probe log + EAPOL queue (RAM only, no flash IO)
     BlazeRecon::sniff(buf, len);
+
+    // BLAZE detector (Phase 7): deauther/fake-beacon accounting (RAM only)
+    BlazeDetector::sniff(buf, len);
 
     if ((buf[12] == 0xc0) || (buf[12] == 0xa0)) {
         tmpDeauths++;

@@ -1,0 +1,53 @@
+<!Doctype html>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width, initial-scale=0.8, minimal-ui">
+<meta name=theme-color content="#000000">
+<meta name=description content="BLAZE // TEAM DARK">
+<title>BLAZE // DETECTOR</title>
+<link rel=stylesheet type="text/css" href=style.css>
+<script src="js/site.js"></script>
+<script src="js/blaze.js"></script>
+<script src="js/detect.js"></script>
+<body>
+<canvas id=matrix></canvas>
+<div id=nav></div>
+<div id=status></div>
+
+<div class=container>
+  <div class=row>
+    <div class=col-12>
+      <h1 class=header>DETECTOR</h1>
+      <p class=dim>Hunt rogue deauthers and fake beacons. Every verdict shows its evidence. Authorized testing only.</p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-6 card">
+      <h2>STATUS</h2>
+      <p class=bold id=detStatus>IDLE</p>
+      <p class=dim>RUN: <span id=detRun class=dim>STOPPED</span> // FINDINGS: <span id=detCount>0</span></p>
+      <p class=dim>Every hit is logged with the frame that triggered it.</p>
+    </div>
+    <div class="col-6 card">
+      <h2>CONTROLS</h2>
+      <p>
+        <button id=detStart onclick="detToggle()">START SCAN</button>
+        <button onclick="detStop()" class=red>STOP</button>
+        <button onclick="detClear()" class=cyan>CLEAR</button>
+      </p>
+      <p class=dim>Scan cycles sniff, analysis and proof. Stop freezes the log as-is.</p>
+    </div>
+  </div>
+
+  <div class=row>
+    <div class="col-12 card">
+      <h2>FINDINGS</h2>
+      <div id=detFindings></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  BLAZE v2.7 // TEAM DARK<br>
+  <a href=scan.html>Scan</a> | <a href=tracker.html>Tracker</a> | <a href=index.html>Dashboard</a>
+</footer>

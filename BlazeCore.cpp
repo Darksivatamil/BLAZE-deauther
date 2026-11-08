@@ -16,6 +16,7 @@
 #include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
+#include "BlazeDetector.h"
 #include "BlazeCfg.h"
 #include "BlazeLoyal.h"
 
@@ -39,6 +40,7 @@ namespace BlazeCore {
         BlazeChat::setup();
         BlazeEvilTwin::setup();
         BlazeRecon::setup();
+        BlazeDetector::setup(); // DETECTOR (Phase 7)
         BlazeLoyal::setup(); // OwnNetGuard + IntruderAlert (plan 2.3)
         BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)
 
@@ -55,6 +57,7 @@ namespace BlazeCore {
         BlazePersona::update();
         BlazeEvilTwin::update();
         BlazeRecon::update(); // pcap flush + EAPOL capture phase machine
+        BlazeDetector::update(); // detector cycle + confirm state machine
         BlazeLoyal::update(); // loyalty watchdogs (own-net sweep + intruder alert)
 
         // boot animation finished -> companion says hello (once)

@@ -31,6 +31,7 @@ var BLAZE_NAV = [
 	["chat.html", "CHAT"],
 	["tracker.html", "TRACK"],
 	["twin.html", "TWIN"],
+	["detect.html", "DETECT"],
 	["settings.html", "SETTINGS"],
 	["info.html", "INFO"]
 ];

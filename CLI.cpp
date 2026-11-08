@@ -6,6 +6,7 @@
 #include "settings.h"
 #include "wifi.h"
 #include "BlazeRecon.h"
+#include "BlazeDetector.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeCfg.h"
 #include "BlazeChat.h"
@@ -872,6 +873,30 @@ void CLI::runCommand(String input) {
         if (list->size() > 1) csv = list->get(1).equalsIgnoreCase("csv");
         if (csv) prntln(BlazeRecon::reportCsv());
         else prntln(BlazeRecon::reportJson());
+    }
+
+    // ===== DETECTOR (Phase 7) =====
+    // detect [start/stop/status/clear/confirm <idx>]
+    else if (eqlsCMD(0, CLI_DETECT)) {
+        String sub = list->size() > 1 ? list->get(1) : String();
+        if (sub.equalsIgnoreCase("stop")) {
+            BlazeDetector::stop();
+            prntln(String(F("detector: stopped")));
+        } else if (sub.equalsIgnoreCase("clear")) {
+            BlazeDetector::clear();
+            prntln(String(F("detector: cleared")));
+        } else if (sub.equalsIgnoreCase("status")) {
+            prntln(BlazeDetector::reportJson());
+        } else if (sub.equalsIgnoreCase("confirm")) {
+            int idx = list->size() > 2 ? list->get(2).toInt() : -1;
+            if (BlazeDetector::confirm(idx)) prntln(String(F("detector: probing...")));
+            else prntln(String(F("detector: probe refused")));
+        } else if (sub.length() == 0 || sub.equalsIgnoreCase("start")) {
+            if (BlazeDetector::start()) prntln(String(F("detector: scan -> 10s sniff -> verdicts")));
+            else prntln(String(F("detector: air busy (stop attack/scan/twin first)")));
+        } else {
+            prntln(String(F("usage: detect [start|stop|status|clear|confirm <idx>]")));
+        }
     }
 
     // ===== SYSTEM ===== //

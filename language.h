@@ -109,6 +109,7 @@ const char CLI_DELETE[] PROGMEM = "delete";                    // delete
 const char CLI_PRINT[] PROGMEM = "print";                      // print
 const char CLI_RUN[] PROGMEM = "run";                          // run
 const char CLI_REPORT[] PROGMEM = "report/reports";            // report, reports (vuln assessment)
+const char CLI_DETECT[] PROGMEM = "detect";                    // detector (deauther/fake-beacon hunt)
 const char CLI_WRITE[] PROGMEM = "write";                      // write
 const char CLI_LED[] PROGMEM = "led";                          // led
 const char CLI_SEND[] PROGMEM = "send";                        // send

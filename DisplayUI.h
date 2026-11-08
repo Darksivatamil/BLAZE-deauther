@@ -87,6 +87,7 @@ enum class DISPLAY_MODE { OFF,
                           CHAT,
                           TRACKER,
                           EVILTWIN,
+                          DETECT,
                           PROBELOG,
                           VULN,
                           PANIC };
@@ -180,6 +181,9 @@ class DisplayUI {
         int  probeScroll   = 0;
         bool probeLogSniff = false;
 
+        // detector screen (phase 7): selected finding in the results list
+        int detectSel = 0;
+
         // menus
         Menu* currentMenu;
 
@@ -229,6 +233,9 @@ class DisplayUI {
         // BLAZE twin
         void drawEvilTwin();
         void startTwin(int idx);
+
+        // BLAZE detector (phase 7)
+        void drawDetect();
 
         // BLAZE recon screens (plans 4.5 / 4.6)
         void drawProbeLog(); // live probe-request list

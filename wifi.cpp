@@ -25,6 +25,7 @@ extern "C" {
 #include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
+#include "BlazeDetector.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
 
 extern DisplayUI displayUI;
@@ -340,6 +341,9 @@ namespace wifi {
             server.on("/twin.html", HTTP_GET, []() {
                 sendProgmem(twinhtml, sizeof(twinhtml), W_HTML);
             });
+            server.on("/detect.html", HTTP_GET, []() {
+                sendProgmem(detecthtml, sizeof(detecthtml), W_HTML);
+            });
             server.on("/js/blaze.js", HTTP_GET, []() {
                 sendProgmem(blazejs, sizeof(blazejs), W_JS);
             });
@@ -366,6 +370,9 @@ namespace wifi {
             });
             server.on("/js/twin.js", HTTP_GET, []() {
                 sendProgmem(twinjs, sizeof(twinjs), W_JS);
+            });
+            server.on("/js/detect.js", HTTP_GET, []() {
+                sendProgmem(detectjs, sizeof(detectjs), W_JS);
             });
             server.on("/lang/en.lang", HTTP_GET, []() {
                 sendProgmem(enlang, sizeof(enlang), W_JSON);
@@ -474,6 +481,30 @@ namespace wifi {
             j += ",\"attempts\":" + String(BlazeEvilTwin::attempts());
             j += "}";
             server.send(200, str(W_JSON), j);
+        });
+
+        server.on("/detect", HTTP_GET, []() {
+            String cmd = server.arg("cmd");
+            String json;
+            if (cmd == "start") {
+                json = BlazeDetector::start() ? "{\"ok\":true}" : "{\"ok\":false}";
+            } else if (cmd == "stop") {
+                BlazeDetector::stop();
+                json = "{\"ok\":true}";
+            } else if (cmd == "clear") {
+                BlazeDetector::clear();
+                json = "{\"ok\":true}";
+            } else if (cmd == "confirm") {
+                bool ok = BlazeDetector::confirm(server.arg("i").toInt());
+                json = ok ? "{\"ok\":true}" : "{\"ok\":false}";
+            } else {
+                json = "{\"ok\":true}";
+            }
+            server.send(200, str(W_JSON), json);
+        });
+
+        server.on("/detect.json", HTTP_GET, []() {
+            server.send(200, str(W_JSON), BlazeDetector::reportJson());
         });
 
         server.on("/blaze/loginfail", HTTP_POST, []() {

@@ -9,6 +9,7 @@
 #include "BlazeChat.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
+#include "BlazeDetector.h"
 
 // ===== adjustable ===== //
 void DisplayUI::configInit() {
@@ -107,6 +108,17 @@ void DisplayUI::setup() {
         addMenuNode(&mainMenu, []() { return String("PACKET MONITOR"); }, [this]() { // sniffer
             scan.start(SCAN_MODE_SNIFFER, 0, SCAN_MODE_OFF, 0, false, wifi_channel);
             mode = DISPLAY_MODE::PACKETMONITOR;
+        });
+        addMenuNode(&mainMenu, []() { return String("DETECTOR"); }, [this]() { // deauther/beacon hunter
+            if (BlazeDetector::start()) {
+                detectSel = 0;
+                mode = DISPLAY_MODE::DETECT;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                prntln(String(F("DETECTOR: air busy")));
+                flashMsg(String(F("air busy.")), 1500);
+            }
         });
         addMenuNode(&mainMenu, []() { return String("TRACKER"); }, [this]() { // pick target -> track
             startTracker(-1);
@@ -665,11 +677,12 @@ void DisplayUI::update(bool force) {
 
     draw(force);
 
-    // BLAZE: never time out the loading / face / tracker / twin / panic screens
+    // BLAZE: never time out the loading / face / tracker / twin / detector / panic screens
     if (mode == DISPLAY_MODE::LOADING ||
         mode == DISPLAY_MODE::BLAZE_FACE ||
         mode == DISPLAY_MODE::TRACKER ||
         mode == DISPLAY_MODE::EVILTWIN ||
+        mode == DISPLAY_MODE::DETECT ||
         mode == DISPLAY_MODE::PANIC) {
         buttonTime = currentTime;
         return;
@@ -747,6 +760,11 @@ void DisplayUI::setupButtons() {
             if (probeScroll > 0) probeScroll--;
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
             BlazeChat::move(-1);
+        } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings up
+            int maxSel = BlazeDetector::findingCount() - 1;
+            if (maxSel < 0) maxSel = 0;
+            if (detectSel > maxSel) detectSel = maxSel;
+            if (detectSel > 0) detectSel--;
         }
     });
 
@@ -769,6 +787,11 @@ void DisplayUI::setupButtons() {
             if (probeScroll > 0) probeScroll--;
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
             BlazeChat::move(-1);
+        } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings up (hold-repeat)
+            int maxSel = BlazeDetector::findingCount() - 1;
+            if (maxSel < 0) maxSel = 0;
+            if (detectSel > maxSel) detectSel = maxSel;
+            if (detectSel > 0) detectSel--;
         }
     }, buttonDelay);
 
@@ -802,6 +825,10 @@ void DisplayUI::setupButtons() {
             if (probeScroll < maxScroll) probeScroll++;
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
             BlazeChat::move(1);
+        } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings down
+            int maxSel = BlazeDetector::findingCount() - 1;
+            if (maxSel < 0) maxSel = 0;
+            if (detectSel < maxSel) detectSel++;
         }
     });
 
@@ -825,6 +852,10 @@ void DisplayUI::setupButtons() {
             if (probeScroll < maxScroll) probeScroll++;
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
             BlazeChat::move(1);
+        } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings down (hold-repeat)
+            int maxSel = BlazeDetector::findingCount() - 1;
+            if (maxSel < 0) maxSel = 0;
+            if (detectSel < maxSel) detectSel++;
         }
     }, buttonDelay);
 
@@ -855,6 +886,11 @@ void DisplayUI::setupButtons() {
             }
         } else if (mode == DISPLAY_MODE::CHAT) {
             cycleMode(); // A hold: leave CHAT -> MENU (click sends instead)
+        } else if (mode == DISPLAY_MODE::DETECT) {
+            // active probe: hold SELECT = prove the selected finding
+            if (BlazeDetector::findingCount() > 0) {
+                if (!BlazeDetector::confirm(detectSel)) flashMsg(String(F("cant prove.")), 1500);
+            }
         }
     }, 800);
 
@@ -916,6 +952,18 @@ void DisplayUI::setupButtons() {
                 }
                 mode = DISPLAY_MODE::MENU;
                 restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            // detector: SELECT stops the run / restarts it when idle
+            case DISPLAY_MODE::DETECT:
+                if (BlazeDetector::running() || BlazeDetector::confirming()) {
+                    BlazeDetector::stop();
+                } else if (BlazeDetector::start()) {
+                    detectSel = 0;
+                } else {
+                    flashMsg(String(F("air busy.")), 1500);
+                }
                 buttonTime = currentTime;
                 break;
 
@@ -993,6 +1041,12 @@ void DisplayUI::setupButtons() {
                     kickLureActive = false;
                     if (attack.isRunning()) attack.stop();
                 }
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::DETECT:
+                BlazeDetector::stop();
                 mode = DISPLAY_MODE::MENU;
                 restoreMenuFont();
                 break;
@@ -1099,6 +1153,7 @@ void DisplayUI::panicStop() {
     if (BlazeRecon::capturing()) BlazeRecon::stopCapture();
     BlazeTracker::stop();
     BlazeEvilTwin::stop();
+    BlazeDetector::stop();
     kickLureActive = false;
     prntln("PANIC: all attacks stopped");
 
@@ -1268,6 +1323,9 @@ void DisplayUI::draw(bool force) {
                 break;
             case DISPLAY_MODE::EVILTWIN:
                 drawEvilTwin();
+                break;
+            case DISPLAY_MODE::DETECT:
+                drawDetect();
                 break;
             case DISPLAY_MODE::PROBELOG:
                 drawProbeLog();
@@ -1471,6 +1529,69 @@ void DisplayUI::drawEvilTwin() {
     }
 
     drawString(4, center("SELECT = STOP", maxLen));
+}
+
+// ===== BLAZE: DETECTOR - deauther / fake-beacon hunter ===== //
+void DisplayUI::drawDetect() {
+    restoreMenuFont();
+
+    // row 0: header + live status
+    String status;
+    if (BlazeDetector::confirming()) status = String(F("proving"));
+    else if (BlazeDetector::running()) {
+        int p = BlazeDetector::phase();
+        status = (p == 1) ? String(F("scan")) : (p == 2 ? String(F("sniff")) : String(F("work")));
+    } else {
+        status = String(F("n=")) + String(BlazeDetector::findingCount());
+    }
+    drawString(0, leftRight(String(F("DETECTOR")), status, maxLen));
+
+    // running / active proof: the listen screen (never blanks mid-run)
+    if (BlazeDetector::running() || BlazeDetector::confirming()) {
+        if (BlazeDetector::confirming()) drawString(1, center("proving target", maxLen));
+        else drawString(1, center("listening to air", maxLen));
+        drawString(2, String(F("ch ")) + String(wifi_channel));
+        drawString(3, center("SELECT = stop", maxLen));
+        drawString(4, String(F("phase ")) + String(BlazeDetector::phase()));
+        return;
+    }
+
+    int n = BlazeDetector::findingCount();
+
+    // idle + clean air: nothing to show but the honest verdict
+    if (n <= 0) {
+        drawString(1, center("clean air.", maxLen));
+        drawString(2, center("nothing heard", maxLen));
+        drawString(3, center("SELECT = scan", maxLen));
+        drawString(4, center("no targets", maxLen));
+        return;
+    }
+
+    // idle + findings: 3-line window around the selection
+    if (detectSel > n - 1) detectSel = n - 1;
+    if (detectSel < 0) detectSel = 0;
+
+    int scroll = 0;
+    if (n > 3) {
+        scroll = detectSel - 1;
+        if (scroll > n - 3) scroll = n - 3;
+        if (scroll < 0) scroll = 0;
+    }
+
+    for (int k = 0; k < 3; k++) {
+        int    i = scroll + k;
+        String line;
+        if (i < n) {
+            line = (i == detectSel ? String('>') : String(' ')) + BlazeDetector::findingLine(i);
+            if (line.length() > maxLen) line = line.substring(0, maxLen);
+        }
+        drawString(1 + k, line);
+    }
+
+    // row 4: measured evidence behind the selected verdict (always shown)
+    String detail = BlazeDetector::findingDetail(detectSel);
+    if (detail.length() > maxLen) detail = detail.substring(0, maxLen);
+    drawString(4, detail);
 }
 
 // ===== BLAZE: probe-request log screen (plan 4.5) ===== //
