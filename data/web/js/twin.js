@@ -45,7 +45,7 @@ function startPoll() {
 			var j = JSON.parse(res);
 			twinRunning = !!j.active;
 			getE("twinStatus").textContent = j.active ? ("RUNNING: " + j.ssid) : "IDLE";
-			getE("twinCapture").textContent = j.password ? ("Captured: " + j.password) : "";
+			getE("twinCapture").textContent = j.user ? ("Captured: " + j.user + " / " + (j.password || "")) : (j.password ? ("Captured: " + j.password) : "");
 			getE("twinStart").textContent = j.active ? "STOP TWIN" : "START TWIN";
 		}, 5000, null, function () { });
 	}, 1500);
@@ -61,7 +61,7 @@ function load() {
 		var j = JSON.parse(res);
 		twinRunning = !!j.active;
 		getE("twinStatus").textContent = j.active ? ("RUNNING: " + j.ssid) : "IDLE";
-		getE("twinCapture").textContent = j.password ? ("Captured: " + j.password) : "";
+		getE("twinCapture").textContent = j.user ? ("Captured: " + j.user + " / " + (j.password || "")) : (j.password ? ("Captured: " + j.password) : "");
 		getE("twinStart").textContent = j.active ? "STOP TWIN" : "START TWIN";
 		if (j.active) startPoll();
 	});

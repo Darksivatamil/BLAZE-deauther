@@ -3,7 +3,7 @@
 # arduino-cli requires sketch folder name == .ino name, so we rsync
 # the project into /tmp/opencode/ESP8266_Deauther_SSD1306 and build there.
 set -e
-SRC="/media/sivaraman/E/AI PROJECTS/BLAZE-deauther"
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DST="/tmp/opencode/ESP8266_Deauther_SSD1306"
 rm -rf "$DST"
 mkdir -p "$DST"
