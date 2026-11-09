@@ -52,11 +52,12 @@ namespace BlazeDetector {
         bool     used;
         uint16_t deauths;
         uint16_t beacons;
-        uint32_t ssidHash[4];   // FNV-1a set: first 4 distinct SSID hashes
+        uint16_t ssidHash[4];   // FNV-1a set: first 4 distinct SSID hashes
         uint8_t  distinctSsids; // distinct count (capped at 255)
         uint8_t  dsChannel;     // channel the beacons claim (DS IE)
         uint8_t  dsMismatch;    // beacons claiming != wifi_channel
         uint8_t  heardCh;       // radio channel of the last mismatch
+        uint16_t secHash;       // folded RSN/WPA IE fingerprint (beacons, 1 SSID)
     };
 
     static Src      srcs[DETECT_MAX_SRCS];
@@ -66,9 +67,12 @@ namespace BlazeDetector {
     static uint32_t windowStartMs;
 
     // ===== active proof: distinct probe responders (RX context) =====
-    static uint8_t respMac[DETECT_MAX_RESP][6];
-    static uint8_t respPrivacy[DETECT_MAX_RESP];
-    static uint8_t respCount;
+    static uint8_t  respMac[DETECT_MAX_RESP][6];
+    static uint8_t  respPrivacy[DETECT_MAX_RESP];
+    static uint16_t respSec[DETECT_MAX_RESP]; // folded security-IE fingerprint
+    static uint8_t  respDs[DETECT_MAX_RESP];  // DS channel the responder claims
+    static uint8_t  respCh[DETECT_MAX_RESP];  // channel we actually heard it on
+    static uint8_t  respCount;
     static bool    confirmSniffActive;
     static char    confirmSsid[33];
     static uint8_t confirmSsidLen;
@@ -122,6 +126,11 @@ namespace BlazeDetector {
         return h;
     }
 
+    // compact 16-bit slot fingerprint (fold the 32-bit FNV value)
+    static uint16_t foldHash(uint32_t h) {
+        return (uint16_t)(h ^ (h >> 16));
+    }
+
     // find-or-create the accounting slot for addr2; NULL when the table is full
     static Src* findSrc(const uint8_t* mac) {
         int freeSlot = -1;
@@ -143,17 +152,27 @@ namespace BlazeDetector {
         return s;
     }
 
+    // already-tracked source? (does not create a slot)
+    static Src* findSrcExisting(const uint8_t* mac) {
+        for (uint8_t i = 0; i < DETECT_MAX_SRCS; i++) {
+            if (srcs[i].used && (memcmp(srcs[i].mac, mac, 6) == 0)) return &srcs[i];
+        }
+        return 0;
+    }
+
     // beacon body: walk IEs from 48 (bounds-checked against len every step)
     static void walkBeaconIes(uint8_t* buf, uint16_t len, Src* s) {
-        uint16_t pos = 48; // hdr24 + timestamp 8 + interval 2 + capability 2
+        uint16_t pos    = 48; // hdr24 + timestamp 8 + interval 2 + capability 2
+        uint32_t secH   = 2166136261UL;
+        bool     secSeen = false;
 
         while (pos + 1 < len) {
             uint8_t tag  = buf[pos];
             uint8_t elen = buf[pos + 1];
             if ((uint16_t)(pos + 2 + elen) > len) break;
 
-            if ((tag == 0x00) && (elen <= 32)) { // SSID -> FNV-1a hash set
-                uint32_t h    = fnv1a(&buf[pos + 2], elen);
+            if ((tag == 0x00) && (elen <= 32)) { // SSID -> compact FNV-1a set
+                uint16_t h    = foldHash(fnv1a(&buf[pos + 2], elen));
                 uint8_t  kept = (s->distinctSsids < 4) ? s->distinctSsids : 4;
                 bool     seen = false;
 
@@ -170,15 +189,34 @@ namespace BlazeDetector {
                     s->dsMismatch++;
                     s->heardCh = wifi_channel; // measured: where we heard it
                 }
+            } else if ((tag == 0x30) || // RSN IE
+                       ((tag == 0xDD) && (elen >= 4) && (buf[pos + 2] == 0x00) &&
+                        (buf[pos + 3] == 0x50) && (buf[pos + 4] == 0xF2) &&
+                        (buf[pos + 5] == 0x01))) { // WPA1 vendor IE
+                secSeen = true;
+                for (uint16_t k = 0; k < (uint16_t)(2 + elen); k++) {
+                    secH ^= buf[pos + k];
+                    secH *= 16777619UL;
+                }
             }
 
             pos = (uint16_t)(pos + 2 + elen);
         }
+
+        // 0 = open/unsecured beacon; otherwise a stable fingerprint of the
+        // security element set. Hash collisions are bounded by 16 bits and are
+        // only ever used together with the privacy bit, DS channel and scan enc.
+        s->secHash = secSeen ? foldHash(secH) : 0;
     }
 
-    // probe response for OUR proof SSID? (byte compare, no String in RX)
-    static bool proofRespMatch(uint8_t* buf, uint16_t len) {
-        uint16_t pos = 48;
+    // probe response for OUR proof SSID? Also measure the responder's security
+    // IE fingerprint and claimed DS channel in the same pass (RX context).
+    static bool proofRespFp(uint8_t* buf, uint16_t len, uint16_t* secOut, uint8_t* dsOut) {
+        uint16_t pos     = 48;
+        uint32_t secH    = 2166136261UL;
+        bool     secSeen = false;
+        bool     match   = false;
+        uint8_t  ds      = 0;
 
         while (pos + 1 < len) {
             uint8_t tag  = buf[pos];
@@ -186,15 +224,30 @@ namespace BlazeDetector {
             if ((uint16_t)(pos + 2 + elen) > len) break;
 
             if (tag == 0x00) { // first SSID IE decides
-                return (elen == confirmSsidLen) && (memcmp(&buf[pos + 2], confirmSsid, elen) == 0);
+                match = (elen == confirmSsidLen) &&
+                        (memcmp(&buf[pos + 2], confirmSsid, elen) == 0);
+            } else if (tag == 0x03 && elen == 1) {
+                ds = buf[pos + 2];
+            } else if ((tag == 0x30) ||
+                       ((tag == 0xDD) && (elen >= 4) && (buf[pos + 2] == 0x00) &&
+                        (buf[pos + 3] == 0x50) && (buf[pos + 4] == 0xF2) &&
+                        (buf[pos + 5] == 0x01))) {
+                secSeen = true;
+                for (uint16_t k = 0; k < (uint16_t)(2 + elen); k++) {
+                    secH ^= buf[pos + k];
+                    secH *= 16777619UL;
+                }
             }
             pos = (uint16_t)(pos + 2 + elen);
         }
-        return false;
+
+        *secOut = secSeen ? foldHash(secH) : 0;
+        *dsOut  = ds;
+        return match;
     }
 
     // remember a distinct answering radio (max 4, never grows)
-    static void recordResp(const uint8_t* mac, uint8_t capByte) {
+    static void recordResp(const uint8_t* mac, uint8_t capByte, uint16_t secFp, uint8_t dsCh, uint8_t heardCh) {
         for (uint8_t i = 0; i < respCount; i++) {
             if (memcmp(respMac[i], mac, 6) == 0) return; // same radio as before
         }
@@ -202,6 +255,9 @@ namespace BlazeDetector {
 
         memcpy(respMac[respCount], mac, 6);
         respPrivacy[respCount] = (capByte & 0x10) ? 1 : 0; // capability privacy bit
+        respSec[respCount]     = secFp;
+        respDs[respCount]      = dsCh;
+        respCh[respCount]      = heardCh;
         respCount++;
     }
 
@@ -235,13 +291,14 @@ namespace BlazeDetector {
     }
 
     static bool addFinding(uint8_t level, uint8_t type, uint8_t ch1, uint8_t ch2, uint8_t enc1, uint8_t enc2,
-                           const uint8_t* bssid2, const char* ssid, const char* detail, uint16_t count) {
+                           const uint8_t* bssid2, const char* ssid, const char* detail, uint16_t count,
+                           uint8_t flags = 0) {
         if (findCount >= DETECT_MAX_FINDINGS) return false; // hard cap
 
         Finding& f = finds[findCount];
         memset(&f, 0, sizeof(Finding));
 
-        f.level = level & 0x03; // grade only; flags live in the high bits
+        f.level = (level & 0x03) | (flags & 0xE0); // grade + measured flags
         f.type  = type;
         f.ch1   = ch1;
         f.ch2   = ch2;
@@ -309,7 +366,8 @@ namespace BlazeDetector {
                 snprintf(d, sizeof(d), "%u deauths/%lus from %s", (unsigned)s.deauths, (unsigned long)secs, m);
             }
 
-            addFinding(level, known ? TYPE_DEAUTH_FLOOD : TYPE_DEAUTH_SPOOF, 0, 0, 0, 0, 0, 0, d, s.deauths);
+            addFinding(level, known ? TYPE_DEAUTH_FLOOD : TYPE_DEAUTH_SPOOF, 0, 0, 0, 0, 0, 0, d, s.deauths,
+                       laa ? FIND_RIVAL : 0);
         }
 
         // ===== 2) beacon spam / SSID flood / wrong-channel beacons =====
@@ -320,23 +378,29 @@ namespace BlazeDetector {
             char m[18];
             macToStr(s.mac, m);
             char d[64];
+            bool laa = (s.mac[0] & 0x02) != 0; // locally administered (rival) source
 
             if (s.beacons >= 15) {
                 uint8_t level = (s.beacons >= 100) ? 2 : ((s.beacons >= 30) ? 1 : 0);
-                snprintf(d, sizeof(d), "%s %u beacons/%lus (spec ~10/s)", m, (unsigned)s.beacons, (unsigned long)secs);
-                addFinding(level, TYPE_BEACON_SPAM, 0, 0, 0, 0, 0, 0, d, s.beacons);
+                snprintf(d, sizeof(d), "%s %u beacons/%lus (spec ~10/s)%s", m, (unsigned)s.beacons,
+                         (unsigned long)secs, laa ? " LAA" : "");
+                addFinding(level, TYPE_BEACON_SPAM, 0, 0, 0, 0, 0, 0, d, s.beacons,
+                           laa ? FIND_RIVAL : 0);
             }
 
             if ((s.distinctSsids >= 5) && (findCount < DETECT_MAX_FINDINGS)) {
                 uint8_t level = (s.distinctSsids >= 10) ? 2 : 1;
-                snprintf(d, sizeof(d), "%s advertises %u SSIDs (fake beacon spam)", m, (unsigned)s.distinctSsids);
-                addFinding(level, TYPE_SSID_FLOOD, 0, 0, 0, 0, 0, 0, d, s.distinctSsids);
+                snprintf(d, sizeof(d), "%s advertises %u SSIDs (fake beacon spam)%s", m,
+                         (unsigned)s.distinctSsids, laa ? " LAA" : "");
+                addFinding(level, TYPE_SSID_FLOOD, 0, 0, 0, 0, 0, 0, d, s.distinctSsids,
+                           laa ? FIND_RIVAL : 0);
             }
 
             if ((s.dsMismatch >= 5) && (findCount < DETECT_MAX_FINDINGS)) {
                 snprintf(d, sizeof(d), "beacon says ch%u, heard on ch %u (x%u)", (unsigned)s.dsChannel,
                          (unsigned)s.heardCh, (unsigned)s.dsMismatch);
-                addFinding(0, TYPE_CH_MISMATCH, s.dsChannel, s.heardCh, 0, 0, 0, 0, d, s.dsMismatch);
+                addFinding(0, TYPE_CH_MISMATCH, s.dsChannel, s.heardCh, 0, 0, 0, 0, d, s.dsMismatch,
+                           laa ? FIND_RIVAL : 0);
             }
         }
 
@@ -367,16 +431,29 @@ namespace BlazeDetector {
                 uint8_t e2  = accesspoints.getEnc(j);
                 bool    laa = ((m1[0] | m2[0]) & 0x02) != 0;
 
-                uint8_t level = ((e1 != e2) || laa) ? 1 : 0;
+                // passive fingerprints measured during the sniff window: only
+                // trust a source that beaconed exactly one SSID (not an SSID flood)
+                Src* f1 = findSrcExisting(m1);
+                Src* f2 = findSrcExisting(m2);
+                bool fp1 = f1 && (f1->beacons >= 1) && (f1->distinctSsids <= 1);
+                bool fp2 = f2 && (f2->beacons >= 1) && (f2->distinctSsids <= 1);
+                bool secD = fp1 && fp2 && (f1->secHash != f2->secHash);
+                bool chD  = fp1 && fp2 && f1->dsChannel && f2->dsChannel &&
+                            (f1->dsChannel != f2->dsChannel);
 
-                char d1[18], d2[18];
-                macToStr(m1, d1);
-                macToStr(m2, d2);
-                char d[64];
-                snprintf(d, sizeof(d), "SSID on 2 BSSIDs ch%u/ch%u enc %u/%u (%s vs %s)", (unsigned)ch1,
-                         (unsigned)ch2, (unsigned)e1, (unsigned)e2, d1, d2);
+                // DS-channel difference alone is normal ESS roaming -> never a
+                // duel by itself. Security/privacy differences are the proofs.
+                bool duel  = (e1 != e2) || secD;
+                bool rival = laa || (e1 != e2) || secD || (ch1 != ch2) || chD;
+                uint8_t level = ((e1 != e2) || secD || laa) ? 1 : 0;
 
-                addFinding(level, TYPE_DUP_SSID, ch1, ch2, e1, e2, m2, ssid, d, 2);
+                uint8_t flags = (duel ? FIND_DUEL : 0) | (rival ? FIND_RIVAL : 0);
+                char    d[64];
+                snprintf(d, sizeof(d), "ch%u/%u e%u/%u sec%c %02X%02X%02X/%02X%02X%02X",
+                         (unsigned)ch1, (unsigned)ch2, (unsigned)e1, (unsigned)e2,
+                         secD ? 'D' : '=', m1[3], m1[4], m1[5], m2[3], m2[4], m2[5]);
+
+                addFinding(level, TYPE_DUP_SSID, ch1, ch2, e1, e2, m2, ssid, d, 2, flags);
             }
         }
     }
@@ -407,19 +484,32 @@ namespace BlazeDetector {
 
         if (respCount >= 2) {
             uint8_t flags = f.level & 0xE0; // keep rival/duel flags already measured
-            if ((f.level & 0x03) < 1) f.level = flags | 1;
 
-            bool mixed = false;
-            for (uint8_t i = 1; i < respCount; i++) {
-                if (respPrivacy[i] != respPrivacy[0]) { mixed = true; break; }
+            bool mixed = false; // capability privacy bit differs
+            bool secD  = false; // RSN/WPA IE fingerprint differs
+            bool dsD   = false; // DS claim contradicts where/who we heard
+
+            for (uint8_t i = 0; i < respCount; i++) {
+                if (respDs[i] && (respDs[i] != respCh[i])) dsD = true; // claims another channel
+
+                for (uint8_t j = (uint8_t)(i + 1); j < respCount; j++) {
+                    if (respPrivacy[i] != respPrivacy[j]) mixed = true;
+                    if (respSec[i] != respSec[j]) secD = true;
+                    if ((respCh[i] == respCh[j]) && respDs[i] && respDs[j] &&
+                        (respDs[i] != respDs[j])) dsD = true; // same channel, different DS claim
+                }
             }
 
-            if (mixed) {
-                f.level = flags | 2; // a clone cannot match the real security mode
-                snprintf(f.detail, sizeof(f.detail), "PROOF: %u radios answer, mixed security (open+wpa2)",
-                         (unsigned)respCount);
+            if (mixed || secD || dsD) {
+                const char* why = mixed ? "security bit differs"
+                                        : (secD ? "security IE differs" : "DS channel mismatch");
+                f.level  = flags | FIND_DUEL | 2; // a clone cannot match the real radio
+                snprintf(f.detail, sizeof(f.detail), "PROOF: %u radios, %s",
+                         (unsigned)respCount, why);
             } else {
-                snprintf(f.detail, sizeof(f.detail), "%u radios answered probe (same security) - roaming or twin",
+                if ((f.level & 0x03) < 1) f.level = flags | 1;
+                snprintf(f.detail, sizeof(f.detail),
+                         "PROOF: %u radios, same security fingerprint - roaming",
                          (unsigned)respCount);
             }
         } else if (respCount == 1) {
@@ -542,7 +632,9 @@ namespace BlazeDetector {
         if (confirmSniffActive) {
             if (fc != 0x50) return; // probe response only
             if (len < 50) return;   // capability (46..47) + IEs from 48
-            if (proofRespMatch(buf, len)) recordResp(&buf[22], buf[46]);
+            uint16_t secFp = 0;
+            uint8_t  dsCh  = 0;
+            if (proofRespFp(buf, len, &secFp, &dsCh)) recordResp(&buf[22], buf[46], secFp, dsCh, wifi_channel);
             return;
         }
 

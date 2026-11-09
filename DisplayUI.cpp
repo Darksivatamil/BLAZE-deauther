@@ -138,7 +138,7 @@ void DisplayUI::setup() {
 #endif // ifdef HIGHLIGHT_LED
     });
 
-    // DETECTOR SUBMENU (phase 9): original scan + hidden-SSID unmasker + timeline
+    // DETECTOR SUBMENU (phase 9/10): scan + hidden-SSID + duel/rival lenses + timeline
     createMenu(&detectMenu, &mainMenu, [this]() {
         addMenuNode(&detectMenu, []() { return String(F("SCAN AIR")); }, [this]() {
             if (BlazeDetector::start(BlazeDetector::FILTER_ALL)) {
@@ -159,6 +159,28 @@ void DisplayUI::setup() {
                 buttonTime = currentTime;
             } else {
                 prntln(String(F("HIDDEN: air busy")));
+                flashMsg(String(F("air busy.")), 1500);
+            }
+        });
+        addMenuNode(&detectMenu, []() { return String(F("PROBE DUEL")); }, [this]() {
+            if (BlazeDetector::start(BlazeDetector::FILTER_DUEL)) {
+                detectSel = 0;
+                mode      = DISPLAY_MODE::DETECT;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                prntln(String(F("DETECTOR: air busy")));
+                flashMsg(String(F("air busy.")), 1500);
+            }
+        });
+        addMenuNode(&detectMenu, []() { return String(F("RIVAL OP")); }, [this]() {
+            if (BlazeDetector::start(BlazeDetector::FILTER_RIVAL)) {
+                detectSel = 0;
+                mode      = DISPLAY_MODE::DETECT;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                prntln(String(F("DETECTOR: air busy")));
                 flashMsg(String(F("air busy.")), 1500);
             }
         });

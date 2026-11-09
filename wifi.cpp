@@ -491,7 +491,17 @@ namespace wifi {
             String cmd = server.arg("cmd");
             String json;
             if (cmd == "start") {
-                json = BlazeDetector::start() ? "{\"ok\":true}" : "{\"ok\":false}";
+                String f = server.arg("filter");
+                uint8_t lens = (f == "duel") ? BlazeDetector::FILTER_DUEL
+                               : (f == "rival") ? BlazeDetector::FILTER_RIVAL
+                                                : BlazeDetector::FILTER_ALL;
+                json = BlazeDetector::start(lens) ? "{\"ok\":true}" : "{\"ok\":false}";
+            } else if (cmd == "filter") {
+                String f = server.arg("f");
+                BlazeDetector::setFilter((f == "duel") ? BlazeDetector::FILTER_DUEL
+                                        : (f == "rival") ? BlazeDetector::FILTER_RIVAL
+                                                         : BlazeDetector::FILTER_ALL);
+                json = "{\"ok\":true}";
             } else if (cmd == "stop") {
                 BlazeDetector::stop();
                 json = "{\"ok\":true}";

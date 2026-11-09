@@ -893,11 +893,19 @@ void CLI::runCommand(String input) {
             int idx = list->size() > 2 ? list->get(2).toInt() : -1;
             if (BlazeDetector::confirm(idx)) prntln(String(F("detector: probing...")));
             else prntln(String(F("detector: probe refused")));
+        } else if (sub.equalsIgnoreCase("duel")) {
+            if (BlazeDetector::start(BlazeDetector::FILTER_DUEL))
+                prntln(String(F("detector: duel lens - scan -> sniff -> duplicates with conflicting fingerprints")));
+            else prntln(String(F("detector: air busy (stop attack/scan/twin first)")));
+        } else if (sub.equalsIgnoreCase("rival")) {
+            if (BlazeDetector::start(BlazeDetector::FILTER_RIVAL))
+                prntln(String(F("detector: rival lens - LAA / mixed-security / channel-mismatch operators")));
+            else prntln(String(F("detector: air busy (stop attack/scan/twin first)")));
         } else if (sub.length() == 0 || sub.equalsIgnoreCase("start")) {
             if (BlazeDetector::start()) prntln(String(F("detector: scan -> 10s sniff -> verdicts")));
             else prntln(String(F("detector: air busy (stop attack/scan/twin first)")));
         } else {
-            prntln(String(F("usage: detect [start|stop|status|clear|confirm <idx>]")));
+            prntln(String(F("usage: detect [start|duel|rival|stop|status|clear|confirm <idx>]")));
         }
     }
 

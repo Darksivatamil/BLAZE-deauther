@@ -126,22 +126,47 @@ sniffer graph. header: channel, deauth count in brackets, packet rate. UP/DOWN
 change channel. **A** stops it and returns.
 
 ### DETECTOR
-hunts other deauthers and fake beacons. one cycle: AP scan → 10 s sniff on a
-channel hop → analysis. every verdict is measured evidence, graded
+opens a submenu: `SCAN AIR` (the original hunter), `HIDDEN SSID`, `PROBE DUEL`,
+`RIVAL OP`, `TIMELINE`. one cycle: AP scan → 10 s sniff on a channel hop →
+analysis. every verdict is measured evidence, graded
 `-` INFO (a fact) · `!` LIKELY (a measured anomaly) · `*` CONFIRMED (measured
 attack behavior). checks: deauth/disassoc floods (≥5/10 s per source; a source
 that is not in the scan = a spoofed radio), beacon spam against the spec's
 ~10/s, one MAC advertising many SSIDs, beacons claiming a different channel
 than the one they were heard on, and one SSID sitting on two BSSIDs (mixed
-encryption or a random MAC = likely clone). while it runs the screen shows the
-phase; afterwards the findings window (UP/DOWN scroll), the selected
-finding's evidence line, `UP/DN B=back`. **A** stops an early run and returns;
-findings from a finished run stay until the next cycle (re-enter `DETECTOR`
-from the menu to re-run). **A-hold** = prove a `DUP` finding: a directed probe
-on both of its channels counting the radios that answer — 2+ answering with
-mixed security (open vs wpa2) = CONFIRMED. own/home SSIDs are never probed.
-stated limits: one radio hears one channel at a time, and a deauther that
-goes quiet outside the 10 s window is invisible to it.
+encryption, a security-IE mismatch or a random MAC = likely clone). while it
+runs the screen shows the phase; afterwards the findings window (UP/DOWN
+scroll), the selected finding's evidence line, `UP/DN SEL=back`. **A** stops an
+early run and returns; findings from a finished run stay until the next cycle.
+**A-hold** = prove a `DUP` finding: a directed probe on both of its channels
+counting the radios that answer — 2+ answering with mixed security, a different
+RSN/WPA security-IE fingerprint, or a DS-channel claim that contradicts where
+they were heard = CONFIRMED. identical fingerprints read as roaming, not a
+clone. `PROBE DUEL` runs the same cycle with the duel lens, `RIVAL OP` with the
+rival lens (LAA deauth/beacon sources, LAA / mixed-security / channel-mismatch
+duplicate SSIDs), `HIDDEN SSID` runs the 15 s unmask cycle, `TIMELINE` shows
+the probe ring newest-first. own/home SSIDs are never probed. stated limits:
+one radio hears one channel at a time, and a deauther that goes quiet outside
+the 10 s window is invisible to it.
+
+### HIDDEN SSID
+15 s AP scan → 12 s channel-hop listen → 4 s directed kick at the hidden BSSIDs
+→ 12 s re-listen. an exact name comes only from an association/reassociation
+request or a probe response matched on the BSSID (`=name`). a directed probe
+request on a channel with exactly one hidden AP is a candidate (`~name`) — never
+sold as fact. conflicting candidates show `?<ambig>`. the evidence line gives
+channel, RSSI, BSSID tail and source (`a` assoc, `r` reassoc, `p` probe-resp,
+`q` probe-req). **A** stops the run and returns to the detector submenu; a
+finished run keeps its results until re-entered.
+
+### PNL HARVEST / VICTIM ID / TIMELINE
+all three reuse the existing 32-entry probe ring (run a scan first).
+`PNL HARVEST` groups probed SSIDs: clients, probe count, best RSSI, last
+channel/age; row 0 is `[BACK]`, **A** opens the selected entry's detail.
+`VICTIM ID` lists unique probing clients with vendor (or `rand` for a
+randomized/LAA MAC), last SSID, probe count and RSSI; same `[BACK]` + detail
+contract. `TIMELINE` sorts the ring newest-first (`12s c6 AABBCC ssid`).
+CLI: `intel [hidden|stop|pnl|victim|timeline|status]`; web: `/intel.json`.
 
 ### TRACKER
 `TRACKER` opens `PICK TARGET` — but only with APs in the list, so run a scan first.
@@ -238,7 +263,8 @@ GET  /blaze/chat      chat log      POST /blaze/chat {"msg":"..."}
 GET  /blaze/tracker   live tracker state   POST /blaze/track {on,target,env,txp,...}
 GET  /report.json     /report.csv   vulnerability report
 GET  /twin  /twin.json  /detect  /detect.json  /attack.json
-GET  /detect?cmd=start|stop|clear|confirm&i=<idx>
+GET  /detect?cmd=start&filter=all|duel|rival   /detect?cmd=filter&f=all|duel|rival
+GET  /detect?cmd=stop|clear|confirm&i=<idx>
 GET  /run?cmd=...     run any CLI command
 ```
 
@@ -259,7 +285,7 @@ attack [beacon] [deauth] [deauthall] [probe] [csa] [nooutput] [-t <timeout>]
 attack status [<on/off>]
 stop <all/scan/attack/script>
 report [json/csv]
-detect [start/stop/status/clear/confirm <idx>]
+detect [start|duel|rival|stop|status|clear|confirm <idx>]
 get <setting>            set <setting> <value>
 blaze chat <message>
 add ssid <ssid> [-wpa2] [-cl <clones>]

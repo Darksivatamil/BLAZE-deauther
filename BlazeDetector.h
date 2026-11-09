@@ -8,7 +8,16 @@
                     far beyond spec, or active proof: 2+ radios with
                     DIFFERENT security answering the same SSID)
    Cycle: WiFi scan -> 10 s channel-hop sniff -> analyze -> findings.
-   Active proof: directed probe -> responses from distinct BSSIDs.
+   Active proof: directed probe -> responses from distinct BSSIDs; the
+   responders are compared by capability privacy bit, folded RSN/WPA
+   security-IE fingerprint and claimed DS channel. A security difference,
+   or a DS claim that contradicts where the responder was heard, proves a
+   duel (FIND_DUEL); identical fingerprints read as roaming.
+   Passive beacons also yield a security-IE + DS-channel fingerprint per
+   BSSID, so duplicate SSIDs can be graded before any active probe.
+   Rival lens (FIND_RIVAL): LAA deauth/beacon sources and duplicate SSIDs
+   with LAA, mixed security or a channel mismatch. Channel mismatch alone
+   stays INFO (normal multi-AP roaming can look the same).
    Honest limits: single radio hears one channel at a time; verdicts
    are graded by evidence, never guessed.
 
@@ -17,9 +26,10 @@
    update() on the main loop. OwnNetGuard: never probes own/home SSID.
 
    JSON schema (/detect.json, reportJson) - consumers depend on it:
-   {"running":bool,"phase":0-4,"count":N,"findings":[{"level":0-2,
-     "type":"DEAUTH_FLOOD|DEAUTH_SPOOF|BEACON_SPAM|SSID_FLOOD|DUP_SSID|CH_MISMATCH",
-     "ssid":"...","detail":"...","confirm":bool}, ...]} */
+   {"running":bool,"phase":0-4,"count":N,"filter":"ALL|DUEL|RIVAL",
+    "findings":[{"level":0-2,"type":"DEAUTH_FLOOD|DEAUTH_SPOOF|BEACON_SPAM|
+     SSID_FLOOD|DUP_SSID|CH_MISMATCH","ssid":"...","detail":"...",
+     "confirm":bool,"duel":bool,"rival":bool}, ...]} */
 
 #pragma once
 
