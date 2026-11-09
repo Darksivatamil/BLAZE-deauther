@@ -100,10 +100,15 @@ namespace BlazeDetector {
         char     ssid[33];
         char     detail[64]; // measured evidence, snprintf-built
         uint16_t count;      // measured count behind the line (not in JSON)
+        // level bits: 0..1 grade, bit 6 = duel evidence, bit 5 = rival operator
     };
+
+    static const uint8_t FIND_DUEL  = 0x40;
+    static const uint8_t FIND_RIVAL = 0x20;
 
     static Finding finds[DETECT_MAX_FINDINGS];
     static uint8_t findCount;
+    static uint8_t viewFilter = FILTER_ALL;
 
     // ================= RX-context helpers (bounded, RAM only) ================= //
 
@@ -236,7 +241,7 @@ namespace BlazeDetector {
         Finding& f = finds[findCount];
         memset(&f, 0, sizeof(Finding));
 
-        f.level = level;
+        f.level = level & 0x03; // grade only; flags live in the high bits
         f.type  = type;
         f.ch1   = ch1;
         f.ch2   = ch2;
@@ -401,7 +406,8 @@ namespace BlazeDetector {
         Finding& f = finds[confIdx];
 
         if (respCount >= 2) {
-            if (f.level < 1) f.level = 1;
+            uint8_t flags = f.level & 0xE0; // keep rival/duel flags already measured
+            if ((f.level & 0x03) < 1) f.level = flags | 1;
 
             bool mixed = false;
             for (uint8_t i = 1; i < respCount; i++) {
@@ -409,7 +415,7 @@ namespace BlazeDetector {
             }
 
             if (mixed) {
-                f.level = 2; // a clone cannot match the real security mode
+                f.level = flags | 2; // a clone cannot match the real security mode
                 snprintf(f.detail, sizeof(f.detail), "PROOF: %u radios answer, mixed security (open+wpa2)",
                          (unsigned)respCount);
             } else {
@@ -497,6 +503,7 @@ namespace BlazeDetector {
         confIdx            = -1;
 
         cycPhase = 0;
+        viewFilter = FILTER_ALL;
     }
 
     void update() {
@@ -569,10 +576,11 @@ namespace BlazeDetector {
         }
     }
 
-    bool start() {
+    bool start(uint8_t filter) {
         if (confState != CONF_IDLE) return false; // never overlap the proof machine
         if (attack.isRunning() || scan.isScanning() || scan.isSniffing() || BlazeEvilTwin::active()) return false;
 
+        viewFilter = (filter <= FILTER_RIVAL) ? filter : FILTER_ALL;
         findCount = 0;
         memset(srcs, 0, sizeof(srcs));
         totalDeauths = 0;
@@ -626,13 +634,52 @@ namespace BlazeDetector {
 
     bool confirming() { return confState != CONF_IDLE; }
 
+    void setFilter(uint8_t f) {
+        viewFilter = (f <= FILTER_RIVAL) ? f : FILTER_ALL;
+    }
+
+    uint8_t filter() { return viewFilter; }
+
+    const char* filterName() {
+        switch (viewFilter) {
+            case FILTER_DUEL:  return "DUEL";
+            case FILTER_RIVAL: return "RIVAL";
+            default:           return "ALL";
+        }
+    }
+
+    static bool passesFilter(const Finding& f) {
+        if (viewFilter == FILTER_DUEL) return (f.level & FIND_DUEL) != 0;
+        if (viewFilter == FILTER_RIVAL) return (f.level & FIND_RIVAL) != 0;
+        return true;
+    }
+
+    int filteredCount() {
+        int n = 0;
+        for (uint8_t i = 0; i < findCount; i++)
+            if (passesFilter(finds[i])) n++;
+        return n;
+    }
+
+    int filteredIndex(int i) {
+        if (i < 0) return -1;
+        int row = 0;
+        for (uint8_t k = 0; k < findCount; k++) {
+            if (!passesFilter(finds[k])) continue;
+            if (row == i) return k;
+            row++;
+        }
+        return -1;
+    }
+
     int findingCount() { return findCount; }
 
     String findingLine(int i) {
         if ((i < 0) || (i >= findCount)) return String();
 
         const Finding& f = finds[i];
-        char           badge = (f.level >= 2) ? '*' : ((f.level == 1) ? '!' : '-');
+        uint8_t        lvl   = f.level & 0x03;
+        char           badge = (lvl >= 2) ? '*' : ((lvl == 1) ? '!' : '-');
         char           line[18];
 
         switch (f.type) {
@@ -663,7 +710,7 @@ namespace BlazeDetector {
 
     uint8_t findingLevel(int i) {
         if ((i < 0) || (i >= findCount)) return 0;
-        return finds[i].level;
+        return finds[i].level & 0x03;
     }
 
     void clear() {
@@ -679,13 +726,15 @@ namespace BlazeDetector {
         j += phase();
         j += String(F(",\"count\":"));
         j += (int)findCount;
-        j += String(F(",\"findings\":["));
+        j += String(F(",\"filter\":\""));
+        j += filterName();
+        j += String(F("\",\"findings\":["));
 
         for (uint8_t i = 0; i < findCount; i++) {
             const Finding& f = finds[i];
             if (i) j += String(F(","));
             j += String(F("{\"level\":"));
-            j += (int)f.level;
+            j += (int)(f.level & 0x03);
             j += String(F(",\"type\":\""));
             j += typeStr(f.type);
             j += String(F("\",\"ssid\":\""));
@@ -695,6 +744,10 @@ namespace BlazeDetector {
             j += String(F("\",\"confirm\":"));
             if (f.type == TYPE_DUP_SSID) j += String(F("true"));
             else j += String(F("false"));
+            j += String(F(",\"duel\":"));
+            j += (f.level & FIND_DUEL) ? String(F("true")) : String(F("false"));
+            j += String(F(",\"rival\":"));
+            j += (f.level & FIND_RIVAL) ? String(F("true")) : String(F("false"));
             j += String(F("}"));
         }
 

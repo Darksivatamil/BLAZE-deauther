@@ -36,6 +36,17 @@ namespace BlazeRecon {
     String   probeLine(int i);// i = 0 is the newest entry
     void     clearProbes();
 
+    // Read-only snapshot for PNL/victim/timeline (Phase 9).
+    struct ProbeInfo {
+        uint8_t  mac[6];
+        char     ssid[33];
+        uint8_t  ch;
+        int8_t   rssi;
+        uint32_t t;    // millis() when last seen
+        uint16_t hits; // times this MAC+SSID was seen (saturated)
+    };
+    bool probeGet(int i, ProbeInfo& out); // i = 0 newest; false = out of range
+
     // ===== vulnerability assessment (4.6) =====
     int         riskScore();    // 0..100 - weakest link in view
     const char* riskLevel();    // NO DATA / LOW / MEDIUM / HIGH / CRITICAL

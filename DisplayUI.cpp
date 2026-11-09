@@ -11,6 +11,7 @@
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
 #include "BlazeBadUSB.h"
+#include "BlazeIntel.h"
 
 // ===== adjustable ===== //
 void DisplayUI::configInit() {
@@ -110,17 +111,7 @@ void DisplayUI::setup() {
             scan.start(SCAN_MODE_SNIFFER, 0, SCAN_MODE_OFF, 0, false, wifi_channel);
             mode = DISPLAY_MODE::PACKETMONITOR;
         });
-        addMenuNode(&mainMenu, []() { return String("DETECTOR"); }, [this]() { // deauther/beacon hunter
-            if (BlazeDetector::start()) {
-                detectSel = 0;
-                mode = DISPLAY_MODE::DETECT;
-                restoreMenuFont();
-                buttonTime = currentTime;
-            } else {
-                prntln(String(F("DETECTOR: air busy")));
-                flashMsg(String(F("air busy.")), 1500);
-            }
-        });
+        addMenuNode(&mainMenu, []() { return String("DETECTOR"); }, &detectMenu); // hunter submenu (phase 9)
         addMenuNode(&mainMenu, []() { return String("BADUSB"); }, &badusbMenu); // external Pico HID
         addMenuNode(&mainMenu, []() { return String("TRACKER"); }, [this]() { // pick target -> track
             startTracker(-1);
@@ -145,6 +136,41 @@ void DisplayUI::setup() {
             digitalWrite(HIGHLIGHT_LED, highlightLED);
         });
 #endif // ifdef HIGHLIGHT_LED
+    });
+
+    // DETECTOR SUBMENU (phase 9): original scan + hidden-SSID unmasker + timeline
+    createMenu(&detectMenu, &mainMenu, [this]() {
+        addMenuNode(&detectMenu, []() { return String(F("SCAN AIR")); }, [this]() {
+            if (BlazeDetector::start(BlazeDetector::FILTER_ALL)) {
+                detectSel = 0;
+                mode      = DISPLAY_MODE::DETECT;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                prntln(String(F("DETECTOR: air busy")));
+                flashMsg(String(F("air busy.")), 1500);
+            }
+        });
+        addMenuNode(&detectMenu, []() { return String(F("HIDDEN SSID")); }, [this]() {
+            if (BlazeIntel::startHidden()) {
+                hiddenSel = 0;
+                mode      = DISPLAY_MODE::HIDDEN;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                prntln(String(F("HIDDEN: air busy")));
+                flashMsg(String(F("air busy.")), 1500);
+            }
+        });
+        addMenuNode(&detectMenu, [this]() {
+            return leftRight(String(F("TIMELINE")), String(BlazeRecon::probeCount()) + "p", maxLen - 1);
+        }, [this]() {
+            BlazeIntel::timelineBuild();
+            timelineSel = 0;
+            mode        = DISPLAY_MODE::TIMELINE;
+            restoreMenuFont();
+            buttonTime = currentTime;
+        });
     });
 
     // SCAN MENU
@@ -174,6 +200,24 @@ void DisplayUI::setup() {
             probeScroll = 0;
             mode        = DISPLAY_MODE::PROBELOG;
             restoreMenuFont();
+        });
+        addMenuNode(&scanMenu, [this]() { // PNL HARVEST (phase 9)
+            return leftRight(String(F("PNL HARVEST")), String(BlazeRecon::probeCount()) + "p", maxLen - 1);
+        }, [this]() {
+            BlazeIntel::pnlBuild();
+            pnlSel = 0;
+            mode   = DISPLAY_MODE::PNL;
+            restoreMenuFont();
+            buttonTime = currentTime;
+        });
+        addMenuNode(&scanMenu, [this]() { // VICTIM ID (phase 9)
+            return leftRight(String(F("VICTIM ID")), String(BlazeRecon::probeCount()) + "p", maxLen - 1);
+        }, [this]() {
+            BlazeIntel::victimBuild();
+            victimSel = 0;
+            mode      = DISPLAY_MODE::VICTIM;
+            restoreMenuFont();
+            buttonTime = currentTime;
         });
         addMenuNode(&scanMenu, [this]() { // VULNERABILITY SCORE (plan 4.6)
             return leftRight("VULN", String(BlazeRecon::riskScore()), maxLen - 1);
@@ -717,6 +761,12 @@ void DisplayUI::update(bool force) {
         mode == DISPLAY_MODE::EVILTWIN ||
         mode == DISPLAY_MODE::DETECT ||
         mode == DISPLAY_MODE::BADUSB ||
+        mode == DISPLAY_MODE::HIDDEN ||
+        mode == DISPLAY_MODE::TIMELINE ||
+        mode == DISPLAY_MODE::PNL ||
+        mode == DISPLAY_MODE::PNLDETAIL ||
+        mode == DISPLAY_MODE::VICTIM ||
+        mode == DISPLAY_MODE::VICTIMDETAIL ||
         mode == DISPLAY_MODE::PANIC) {
         buttonTime = currentTime;
         return;
@@ -795,10 +845,40 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
             BlazeChat::move(-1);
         } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings up
-            int maxSel = BlazeDetector::findingCount() - 1;
+            int maxSel = BlazeDetector::filteredCount() - 1;
             if (maxSel < 0) maxSel = 0;
             if (detectSel > maxSel) detectSel = maxSel;
             if (detectSel > 0) detectSel--;
+        } else if (mode == DISPLAY_MODE::HIDDEN) {
+            int n = BlazeIntel::hiddenCount();
+            if (n > 0) {
+                hiddenSel--;
+                if (hiddenSel < 0) hiddenSel = n - 1;
+            }
+        } else if (mode == DISPLAY_MODE::TIMELINE) {
+            int n = BlazeIntel::timelineCount();
+            if (n > 0) {
+                timelineSel--;
+                if (timelineSel < 0) timelineSel = n - 1;
+            }
+        } else if (mode == DISPLAY_MODE::PNL) {
+            int maxSel = BlazeIntel::pnlCount();
+            pnlSel--;
+            if (pnlSel < 0) pnlSel = maxSel;
+        } else if (mode == DISPLAY_MODE::PNLDETAIL) {
+            if (pnlDetail > 0) {
+                pnlDetail--;
+                pnlSel = pnlDetail + 1;
+            }
+        } else if (mode == DISPLAY_MODE::VICTIM) {
+            int maxSel = BlazeIntel::victimCount();
+            victimSel--;
+            if (victimSel < 0) victimSel = maxSel;
+        } else if (mode == DISPLAY_MODE::VICTIMDETAIL) {
+            if (victimDetail > 0) {
+                victimDetail--;
+                victimSel = victimDetail + 1;
+            }
         }
     });
 
@@ -822,10 +902,40 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
             BlazeChat::move(-1);
         } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings up (hold-repeat)
-            int maxSel = BlazeDetector::findingCount() - 1;
+            int maxSel = BlazeDetector::filteredCount() - 1;
             if (maxSel < 0) maxSel = 0;
             if (detectSel > maxSel) detectSel = maxSel;
             if (detectSel > 0) detectSel--;
+        } else if (mode == DISPLAY_MODE::HIDDEN) {
+            int n = BlazeIntel::hiddenCount();
+            if (n > 0) {
+                hiddenSel--;
+                if (hiddenSel < 0) hiddenSel = n - 1;
+            }
+        } else if (mode == DISPLAY_MODE::TIMELINE) {
+            int n = BlazeIntel::timelineCount();
+            if (n > 0) {
+                timelineSel--;
+                if (timelineSel < 0) timelineSel = n - 1;
+            }
+        } else if (mode == DISPLAY_MODE::PNL) {
+            int maxSel = BlazeIntel::pnlCount();
+            pnlSel--;
+            if (pnlSel < 0) pnlSel = maxSel;
+        } else if (mode == DISPLAY_MODE::PNLDETAIL) {
+            if (pnlDetail > 0) {
+                pnlDetail--;
+                pnlSel = pnlDetail + 1;
+            }
+        } else if (mode == DISPLAY_MODE::VICTIM) {
+            int maxSel = BlazeIntel::victimCount();
+            victimSel--;
+            if (victimSel < 0) victimSel = maxSel;
+        } else if (mode == DISPLAY_MODE::VICTIMDETAIL) {
+            if (victimDetail > 0) {
+                victimDetail--;
+                victimSel = victimDetail + 1;
+            }
         }
     }, buttonDelay);
 
@@ -860,9 +970,39 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel
             BlazeChat::move(1);
         } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings down
-            int maxSel = BlazeDetector::findingCount() - 1;
+            int maxSel = BlazeDetector::filteredCount() - 1;
             if (maxSel < 0) maxSel = 0;
             if (detectSel < maxSel) detectSel++;
+        } else if (mode == DISPLAY_MODE::HIDDEN) {
+            int n = BlazeIntel::hiddenCount();
+            if (n > 0) {
+                hiddenSel++;
+                if (hiddenSel >= n) hiddenSel = 0;
+            }
+        } else if (mode == DISPLAY_MODE::TIMELINE) {
+            int n = BlazeIntel::timelineCount();
+            if (n > 0) {
+                timelineSel++;
+                if (timelineSel >= n) timelineSel = 0;
+            }
+        } else if (mode == DISPLAY_MODE::PNL) {
+            int maxSel = BlazeIntel::pnlCount();
+            pnlSel++;
+            if (pnlSel > maxSel) pnlSel = 0;
+        } else if (mode == DISPLAY_MODE::PNLDETAIL) {
+            if (pnlDetail < BlazeIntel::pnlCount() - 1) {
+                pnlDetail++;
+                pnlSel = pnlDetail + 1;
+            }
+        } else if (mode == DISPLAY_MODE::VICTIM) {
+            int maxSel = BlazeIntel::victimCount();
+            victimSel++;
+            if (victimSel > maxSel) victimSel = 0;
+        } else if (mode == DISPLAY_MODE::VICTIMDETAIL) {
+            if (victimDetail < BlazeIntel::victimCount() - 1) {
+                victimDetail++;
+                victimSel = victimDetail + 1;
+            }
         }
     });
 
@@ -887,9 +1027,39 @@ void DisplayUI::setupButtons() {
         } else if (mode == DISPLAY_MODE::CHAT) {          // phrase wheel (hold-repeat)
             BlazeChat::move(1);
         } else if (mode == DISPLAY_MODE::DETECT) {        // scroll findings down (hold-repeat)
-            int maxSel = BlazeDetector::findingCount() - 1;
+            int maxSel = BlazeDetector::filteredCount() - 1;
             if (maxSel < 0) maxSel = 0;
             if (detectSel < maxSel) detectSel++;
+        } else if (mode == DISPLAY_MODE::HIDDEN) {
+            int n = BlazeIntel::hiddenCount();
+            if (n > 0) {
+                hiddenSel++;
+                if (hiddenSel >= n) hiddenSel = 0;
+            }
+        } else if (mode == DISPLAY_MODE::TIMELINE) {
+            int n = BlazeIntel::timelineCount();
+            if (n > 0) {
+                timelineSel++;
+                if (timelineSel >= n) timelineSel = 0;
+            }
+        } else if (mode == DISPLAY_MODE::PNL) {
+            int maxSel = BlazeIntel::pnlCount();
+            pnlSel++;
+            if (pnlSel > maxSel) pnlSel = 0;
+        } else if (mode == DISPLAY_MODE::PNLDETAIL) {
+            if (pnlDetail < BlazeIntel::pnlCount() - 1) {
+                pnlDetail++;
+                pnlSel = pnlDetail + 1;
+            }
+        } else if (mode == DISPLAY_MODE::VICTIM) {
+            int maxSel = BlazeIntel::victimCount();
+            victimSel++;
+            if (victimSel > maxSel) victimSel = 0;
+        } else if (mode == DISPLAY_MODE::VICTIMDETAIL) {
+            if (victimDetail < BlazeIntel::victimCount() - 1) {
+                victimDetail++;
+                victimSel = victimDetail + 1;
+            }
         }
     }, buttonDelay);
 
@@ -922,8 +1092,9 @@ void DisplayUI::setupButtons() {
             cycleMode(); // A hold: leave CHAT -> MENU (click sends instead)
         } else if (mode == DISPLAY_MODE::DETECT) {
             // active probe: hold SELECT = prove the selected finding
-            if (BlazeDetector::findingCount() > 0) {
-                if (!BlazeDetector::confirm(detectSel)) flashMsg(String(F("cant prove.")), 1500);
+            if (BlazeDetector::filteredCount() > 0) {
+                int idx = BlazeDetector::filteredIndex(detectSel);
+                if ((idx < 0) || !BlazeDetector::confirm(idx)) flashMsg(String(F("cant prove.")), 1500);
             }
         }
     }, 800);
@@ -989,11 +1160,64 @@ void DisplayUI::setupButtons() {
                 buttonTime = currentTime;
                 break;
 
-            // detector: SELECT = stop an early run, then back to menu
+            // detector: SELECT = stop an early run, then back to the detector submenu
             // (same one-press contract as twin/probe log - this board has no B button)
             case DISPLAY_MODE::DETECT:
                 if (BlazeDetector::running() || BlazeDetector::confirming()) BlazeDetector::stop();
+                changeMenu(&detectMenu);
                 mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            // probe intelligence: select inside, re-click select to step back
+            case DISPLAY_MODE::HIDDEN:
+                BlazeIntel::stopHidden();
+                changeMenu(&detectMenu);
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::TIMELINE:
+                changeMenu(&detectMenu);
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::PNL:
+                if (pnlSel <= 0) {
+                    changeMenu(&scanMenu);
+                    mode = DISPLAY_MODE::MENU;
+                } else {
+                    pnlDetail = pnlSel - 1;
+                    mode      = DISPLAY_MODE::PNLDETAIL;
+                }
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::PNLDETAIL:
+                mode = DISPLAY_MODE::PNL;
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::VICTIM:
+                if (victimSel <= 0) {
+                    changeMenu(&scanMenu);
+                    mode = DISPLAY_MODE::MENU;
+                } else {
+                    victimDetail = victimSel - 1;
+                    mode         = DISPLAY_MODE::VICTIMDETAIL;
+                }
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
+            case DISPLAY_MODE::VICTIMDETAIL:
+                mode = DISPLAY_MODE::VICTIM;
                 restoreMenuFont();
                 buttonTime = currentTime;
                 break;
@@ -1087,7 +1311,53 @@ void DisplayUI::setupButtons() {
 
             case DISPLAY_MODE::DETECT:
                 BlazeDetector::stop();
+                changeMenu(&detectMenu);
                 mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::HIDDEN:
+                BlazeIntel::stopHidden();
+                changeMenu(&detectMenu);
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::TIMELINE:
+                changeMenu(&detectMenu);
+                mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::PNL:
+                if (pnlSel <= 0) {
+                    changeMenu(&scanMenu);
+                    mode = DISPLAY_MODE::MENU;
+                } else {
+                    pnlDetail = pnlSel - 1;
+                    mode      = DISPLAY_MODE::PNLDETAIL;
+                }
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::PNLDETAIL:
+                mode = DISPLAY_MODE::PNL;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::VICTIM:
+                if (victimSel <= 0) {
+                    changeMenu(&scanMenu);
+                    mode = DISPLAY_MODE::MENU;
+                } else {
+                    victimDetail = victimSel - 1;
+                    mode         = DISPLAY_MODE::VICTIMDETAIL;
+                }
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::VICTIMDETAIL:
+                mode = DISPLAY_MODE::VICTIM;
                 restoreMenuFont();
                 break;
 
@@ -1202,6 +1472,7 @@ void DisplayUI::panicStop() {
     BlazeEvilTwin::stop();
     BlazeDetector::stop();
     BlazeBadUSB::stop();
+    BlazeIntel::stopHidden();
     kickLureActive = false;
     prntln("PANIC: all attacks stopped");
 
@@ -1377,6 +1648,24 @@ void DisplayUI::draw(bool force) {
                 break;
             case DISPLAY_MODE::BADUSB:
                 drawBadUsb();
+                break;
+            case DISPLAY_MODE::HIDDEN:
+                drawHidden();
+                break;
+            case DISPLAY_MODE::TIMELINE:
+                drawTimeline();
+                break;
+            case DISPLAY_MODE::PNL:
+                drawPnl();
+                break;
+            case DISPLAY_MODE::PNLDETAIL:
+                drawPnlDetail();
+                break;
+            case DISPLAY_MODE::VICTIM:
+                drawVictim();
+                break;
+            case DISPLAY_MODE::VICTIMDETAIL:
+                drawVictimDetail();
                 break;
             case DISPLAY_MODE::PROBELOG:
                 drawProbeLog();
@@ -1586,14 +1875,14 @@ void DisplayUI::drawEvilTwin() {
 void DisplayUI::drawDetect() {
     restoreMenuFont();
 
-    // row 0: header + live status
+    // row 0: header + live status / active filter
     String status;
     if (BlazeDetector::confirming()) status = String(F("proving"));
     else if (BlazeDetector::running()) {
         int p = BlazeDetector::phase();
         status = (p == 1) ? String(F("scan")) : (p == 2 ? String(F("sniff")) : String(F("work")));
     } else {
-        status = String(F("n=")) + String(BlazeDetector::findingCount());
+        status = String(BlazeDetector::filterName()) + " " + String(BlazeDetector::filteredCount());
     }
     drawString(0, leftRight(String(F("DETECTOR")), status, maxLen));
 
@@ -1607,14 +1896,22 @@ void DisplayUI::drawDetect() {
         return;
     }
 
-    int n = BlazeDetector::findingCount();
+    int n = BlazeDetector::filteredCount();
 
     // idle + clean air: nothing to show but the honest verdict
     if (n <= 0) {
-        drawString(1, center("clean air.", maxLen));
-        drawString(2, center("nothing heard", maxLen));
-        drawString(3, "");
-        drawString(4, center("B = back", maxLen));
+        if (BlazeDetector::filter() != BlazeDetector::FILTER_ALL) {
+            drawString(1, center("no matches.", maxLen));
+            drawString(2, center(BlazeDetector::filter() == BlazeDetector::FILTER_DUEL
+                                 ? "no probe duels" : "no rivals heard", maxLen));
+            drawString(3, "");
+            drawString(4, center("SELECT=back", maxLen));
+        } else {
+            drawString(1, center("clean air.", maxLen));
+            drawString(2, center("nothing heard", maxLen));
+            drawString(3, "");
+            drawString(4, center("SELECT=back", maxLen));
+        }
         return;
     }
 
@@ -1633,18 +1930,22 @@ void DisplayUI::drawDetect() {
         int    i = scroll + k;
         String line;
         if (i < n) {
-            line = (i == detectSel ? String('>') : String(' ')) + BlazeDetector::findingLine(i);
-            if (line.length() > maxLen) line = line.substring(0, maxLen);
+            int raw = BlazeDetector::filteredIndex(i);
+            if (raw >= 0) {
+                line = (i == detectSel ? String('>') : String(' ')) + BlazeDetector::findingLine(raw);
+                if (line.length() > maxLen) line = line.substring(0, maxLen);
+            }
         }
         drawString(1 + k, line);
     }
 
     // row 3: measured evidence behind the selected verdict (always shown)
-    String detail = BlazeDetector::findingDetail(detectSel);
+    int rawSel = BlazeDetector::filteredIndex(detectSel);
+    String detail = (rawSel >= 0) ? BlazeDetector::findingDetail(rawSel) : String();
     if (detail.length() > maxLen) detail = detail.substring(0, maxLen);
     drawString(3, detail);
 
-    drawString(4, center("UP/DN B=back", maxLen));
+    drawString(4, center("UP/DN SEL=back", maxLen));
 }
 
 // ===== BLAZE: BADUSB - external Pico HID link ===== //
@@ -1672,6 +1973,222 @@ void DisplayUI::drawBadUsb() {
     drawString(4, center("SELECT = STOP", maxLen));
 }
 
+// ===== BLAZE: hidden-SSID unmasker (phase 9) ===== //
+void DisplayUI::drawHidden() {
+    restoreMenuFont();
+
+    int    n    = BlazeIntel::hiddenCount();
+    int    u    = BlazeIntel::hiddenUnmasked();
+    String head = String(F("HIDDEN ")) + String(u) + "/" + String(n);
+
+    if (BlazeIntel::hiddenRunning()) {
+        drawString(0, leftRight(head, String(BlazeIntel::hiddenPhaseName()), maxLen - 1));
+
+        switch (BlazeIntel::hiddenPhase()) {
+            case BlazeIntel::HID_SCAN:
+                drawString(1, center("AP scan 15s", maxLen));
+                drawString(2, center("find hidden APs", maxLen));
+                break;
+            case BlazeIntel::HID_LISTEN:
+                drawString(1, center("assoc/probe listen", maxLen));
+                drawString(2, center("12s channel hop", maxLen));
+                break;
+            case BlazeIntel::HID_KICK:
+                drawString(1, center("directed kick", maxLen));
+                drawString(2, center("4s deauth", maxLen));
+                break;
+            default:
+                drawString(1, center("re-listen 12s", maxLen));
+                drawString(2, center("waiting rejoin", maxLen));
+                break;
+        }
+        drawString(3, String(F("ch ")) + String(wifi_channel) + " / hop");
+        drawString(4, center("SELECT = stop", maxLen));
+        return;
+    }
+
+    drawString(0, leftRight(head, String(F("done")), maxLen - 1));
+
+    if (n <= 0) {
+        drawString(1, center("no hidden APs.", maxLen));
+        drawString(2, center("clean air.", maxLen));
+        drawString(4, center("SELECT = back", maxLen));
+        return;
+    }
+
+    if (hiddenSel < 0) hiddenSel = 0;
+    if (hiddenSel >= n) hiddenSel = n - 1;
+
+    const int rows = 2;
+    int       row  = hiddenSel - 1;
+    if (row > n - rows) row = n - rows;
+    if (row < 0) row = 0;
+
+    for (int k = 0; k < rows; k++) {
+        int i = row + k;
+        if (i >= n) break;
+        String line = (i == hiddenSel ? String('>') : String(' ')) + BlazeIntel::hiddenLine(i);
+        if (line.length() > maxLen) line = line.substring(0, maxLen);
+        drawString(1 + k, line);
+    }
+
+    // measured evidence for the selected AP (channel, RSSI, BSSID tail, source)
+    String det = BlazeIntel::hiddenDetail(hiddenSel);
+    if (det.length() > maxLen) det = det.substring(0, maxLen);
+    drawString(3, det);
+
+    drawString(4, center("UP/DN SEL=back", maxLen));
+}
+
+// ===== BLAZE: probe forensics timeline (phase 9) ===== //
+void DisplayUI::drawTimeline() {
+    restoreMenuFont();
+
+    int n = BlazeIntel::timelineCount();
+    drawString(0, leftRight(String(F("TIMELINE")), String(n) + "p", maxLen - 1));
+
+    if (n <= 0) {
+        drawString(1, center("no probe history.", maxLen));
+        drawString(2, center("run a scan first", maxLen));
+        drawString(4, center("SELECT = back", maxLen));
+        return;
+    }
+
+    if (timelineSel < 0) timelineSel = 0;
+    if (timelineSel >= n) timelineSel = n - 1;
+
+    const int rows = 3;
+    int       row  = timelineSel - 1;
+    if (row > n - rows) row = n - rows;
+    if (row < 0) row = 0;
+
+    for (int k = 0; k < rows; k++) {
+        int i = row + k;
+        if (i >= n) break;
+        String line = (i == timelineSel ? String('>') : String(' ')) +
+                      leftRight(BlazeIntel::timelineSsid(i), BlazeIntel::timelineRight(i), maxLen - 2);
+        if (line.length() > maxLen) line = line.substring(0, maxLen);
+        drawString(1 + k, line);
+    }
+
+    drawString(4, center("SELECT = back", maxLen));
+}
+
+// ===== BLAZE: PNL harvesting (phase 9) ===== //
+void DisplayUI::drawPnl() {
+    restoreMenuFont();
+
+    int n = BlazeIntel::pnlCount();
+    drawString(0, leftRight(String(F("PNL ")) + String(n), String(F("SEL=open")), maxLen - 1));
+
+    if (n <= 0) {
+        drawString(1, center("no probe SSIDs.", maxLen));
+        drawString(2, center("run a scan first", maxLen));
+        drawString(4, center("SELECT = back", maxLen));
+        return;
+    }
+
+    int maxSel = n; // row 0 = [BACK]
+    if (pnlSel < 0) pnlSel = 0;
+    if (pnlSel > maxSel) pnlSel = maxSel;
+
+    const int rows = 4;
+    int       row  = pnlSel - 1;
+    if (row > maxSel - (rows - 1)) row = maxSel - (rows - 1);
+    if (row < 0) row = 0;
+
+    for (int k = 0; k < rows; k++) {
+        int i = row + k;
+        if (i > maxSel) break;
+
+        String line;
+        if (i == 0) line = (pnlSel == 0 ? String('>') : String(' ')) + String(F("[BACK]"));
+        else line = (pnlSel == i ? String('>') : String(' ')) + BlazeIntel::pnlLine(i - 1);
+        if (line.length() > maxLen) line = line.substring(0, maxLen);
+        drawString(1 + k, line);
+    }
+}
+
+void DisplayUI::drawPnlDetail() {
+    restoreMenuFont();
+
+    int i = pnlDetail;
+    if ((i < 0) || (i >= BlazeIntel::pnlCount())) {
+        mode = DISPLAY_MODE::PNL;
+        return;
+    }
+
+    drawString(0, leftRight(String(F("PNL DETAIL")), String(BlazeIntel::pnlAgeSec(i)) + "s", maxLen - 1));
+
+    String ssid = BlazeIntel::pnlSsid(i);
+    if (ssid.length() > maxLen) ssid = ssid.substring(0, maxLen);
+    drawString(1, ssid);
+
+    drawString(2, String(F("clients ")) + String(BlazeIntel::pnlClients(i)) +
+                  String(F(" ch ")) + String(BlazeIntel::pnlCh(i)));
+    drawString(3, String(F("p")) + String(BlazeIntel::pnlProbeCount(i)) +
+                  String(F(" rssi ")) + String(BlazeIntel::pnlRssi(i)));
+    drawString(4, center("SELECT = back", maxLen));
+}
+
+// ===== BLAZE: victim ID (phase 9) ===== //
+void DisplayUI::drawVictim() {
+    restoreMenuFont();
+
+    int n = BlazeIntel::victimCount();
+    drawString(0, leftRight(String(F("VICTIM ")) + String(n), String(F("SEL=open")), maxLen - 1));
+
+    if (n <= 0) {
+        drawString(1, center("no probing clients", maxLen));
+        drawString(2, center("run a scan first", maxLen));
+        drawString(4, center("SELECT = back", maxLen));
+        return;
+    }
+
+    int maxSel = n; // row 0 = [BACK]
+    if (victimSel < 0) victimSel = 0;
+    if (victimSel > maxSel) victimSel = maxSel;
+
+    const int rows = 4;
+    int       row  = victimSel - 1;
+    if (row > maxSel - (rows - 1)) row = maxSel - (rows - 1);
+    if (row < 0) row = 0;
+
+    for (int k = 0; k < rows; k++) {
+        int i = row + k;
+        if (i > maxSel) break;
+
+        String line;
+        if (i == 0) line = (victimSel == 0 ? String('>') : String(' ')) + String(F("[BACK]"));
+        else line = (victimSel == i ? String('>') : String(' ')) + BlazeIntel::victimLine(i - 1);
+        if (line.length() > maxLen) line = line.substring(0, maxLen);
+        drawString(1 + k, line);
+    }
+}
+
+void DisplayUI::drawVictimDetail() {
+    restoreMenuFont();
+
+    int i = victimDetail;
+    if ((i < 0) || (i >= BlazeIntel::victimCount())) {
+        mode = DISPLAY_MODE::VICTIM;
+        return;
+    }
+
+    String headRight = String(F("ch")) + String(BlazeIntel::victimCh(i)) + " " +
+                       String(BlazeIntel::victimRssi(i));
+    drawString(0, leftRight(BlazeIntel::victimVendor(i), headRight, maxLen - 1));
+    drawString(1, BlazeIntel::victimMac(i));
+
+    drawString(2, String(F("p")) + String(BlazeIntel::victimProbeCount(i)) +
+                  String(F(" seen ")) + String(BlazeIntel::victimAgeSec(i)) + "s");
+
+    String ssid = BlazeIntel::victimSsid(i);
+    if (ssid.length() > maxLen) ssid = ssid.substring(0, maxLen);
+    drawString(3, ssid);
+    drawString(4, center("SELECT = back", maxLen));
+}
+
 // ===== BLAZE: probe-request log screen (plan 4.5) ===== //
 void DisplayUI::drawProbeLog() {
     restoreMenuFont();
@@ -1681,7 +2198,7 @@ void DisplayUI::drawProbeLog() {
 
     if (n == 0) {
         drawString(2, center("waiting for probes", maxLen));
-        drawString(4, center("B = back", maxLen));
+        drawString(4, center("SELECT=back", maxLen));
         return;
     }
 
@@ -1697,7 +2214,7 @@ void DisplayUI::drawProbeLog() {
         drawString(r + 1, BlazeRecon::probeLine(i));
     }
 
-    drawString(4, center("UP/DN B=back", maxLen));
+    drawString(4, center("UP/DN SEL=back", maxLen));
 }
 
 // ===== BLAZE: vulnerability score screen (plan 4.6) ===== //
@@ -1717,7 +2234,7 @@ void DisplayUI::drawVuln() {
         drawString(2, center("no APs. scan now.", maxLen));
     }
 
-    drawString(4, center("B = back", maxLen));
+    drawString(4, center("SELECT=back", maxLen));
 }
 
 void DisplayUI::drawButtonTest() {

@@ -18,6 +18,7 @@
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
 #include "BlazeBadUSB.h"
+#include "BlazeIntel.h"
 #include "BlazeCfg.h"
 #include "BlazeLoyal.h"
 
@@ -43,6 +44,7 @@ namespace BlazeCore {
         BlazeRecon::setup();
         BlazeDetector::setup(); // DETECTOR (Phase 7)
         BlazeBadUSB::setup();   // external Pico HID link (Phase 8)
+        BlazeIntel::setup();    // hidden-SSID unmasker / probe intel (Phase 9)
         BlazeLoyal::setup(); // OwnNetGuard + IntruderAlert (plan 2.3)
         BlazeFace::loadWeights(); // reaction weights editor (plan 3.2)
 
@@ -61,6 +63,7 @@ namespace BlazeCore {
         BlazeRecon::update(); // pcap flush + EAPOL capture phase machine
         BlazeDetector::update(); // detector cycle + confirm state machine
         BlazeBadUSB::update();   // duck ACK poll (non-blocking)
+        BlazeIntel::update();    // hidden-SSID state machine (non-blocking)
         BlazeLoyal::update(); // loyalty watchdogs (own-net sweep + intruder alert)
 
         // boot animation finished -> companion says hello (once)

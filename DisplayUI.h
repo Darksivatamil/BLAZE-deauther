@@ -91,6 +91,12 @@ enum class DISPLAY_MODE { OFF,
                           PROBELOG,
                           VULN,
                           BADUSB,
+                          HIDDEN,
+                          TIMELINE,
+                          PNL,
+                          PNLDETAIL,
+                          VICTIM,
+                          VICTIMDETAIL,
                           PANIC };
 
 class DisplayUI {
@@ -185,6 +191,14 @@ class DisplayUI {
         // detector screen (phase 7): selected finding in the results list
         int detectSel = 0;
 
+        // probe intelligence screens (phase 9)
+        int8_t hiddenSel     = 0;
+        int8_t timelineSel   = 0;
+        int8_t pnlSel        = 0; // 0 = [BACK], 1.. = PNL entry
+        int8_t pnlDetail     = 0;
+        int8_t victimSel     = 0;
+        int8_t victimDetail  = 0;
+
         // menus
         Menu* currentMenu;
 
@@ -196,6 +210,7 @@ class DisplayUI {
         Menu clockMenu;
         Menu weightMenu; // reaction weights editor (plan 3.2)
         Menu badusbMenu; // BADUSB NORMAL / CRITICAL / EXIT
+        Menu detectMenu; // DETECTOR submenu (phase 9/10)
 
         Menu apListMenu;
         Menu stationListMenu;
@@ -241,6 +256,14 @@ class DisplayUI {
 
         // BLAZE BadUSB (phase 8)
         void drawBadUsb();
+
+        // BLAZE probe intelligence (phase 9)
+        void drawHidden();
+        void drawTimeline();
+        void drawPnl();
+        void drawPnlDetail();
+        void drawVictim();
+        void drawVictimDetail();
 
         // BLAZE recon screens (plans 4.5 / 4.6)
         void drawProbeLog(); // live probe-request list

@@ -27,6 +27,7 @@ extern "C" {
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
 #include "BlazeBadUSB.h"
+#include "BlazeIntel.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
 
 extern DisplayUI displayUI;
@@ -409,6 +410,8 @@ namespace wifi {
             json += BlazeEvilTwin::active() ? "true" : "false";
             json += ",\"track\":";
             json += BlazeTracker::active() ? "true" : "false";
+            json += ",\"hidden\":";
+            json += BlazeIntel::hiddenRunning() ? "true" : "false";
             uint8_t ln = BlazePersona::logCount();
             json += ",\"stance\":\"" + String(BlazePersona::stanceName()) + "\"";
             json += ",\"line\":\"" + String(ln ? BlazePersona::logLine(ln - 1) : "--") + "\"";
@@ -506,6 +509,11 @@ namespace wifi {
 
         server.on("/detect.json", HTTP_GET, []() {
             server.send(200, str(W_JSON), BlazeDetector::reportJson());
+        });
+
+        // ===== PROBE INTELLIGENCE (Phase 9) =====
+        server.on("/intel.json", HTTP_GET, []() {
+            server.send(200, str(W_JSON), BlazeIntel::reportJson());
         });
 
         // ===== BADUSB (Phase 8) =====

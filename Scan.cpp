@@ -6,6 +6,7 @@
 #include "wifi.h"
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
+#include "BlazeIntel.h"
 
 Scan::Scan() {
     list = new SimpleList<uint16_t>;
@@ -23,6 +24,9 @@ void Scan::sniffer(uint8_t* buf, uint16_t len) {
 
     // BLAZE detector (Phase 7): deauther/fake-beacon accounting (RAM only)
     BlazeDetector::sniff(buf, len);
+
+    // BLAZE probe intel (Phase 9): hidden-SSID evidence (RAM only)
+    BlazeIntel::sniff(buf, len);
 
     if ((buf[12] == 0xc0) || (buf[12] == 0xa0)) {
         tmpDeauths++;

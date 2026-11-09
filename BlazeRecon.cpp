@@ -54,11 +54,12 @@ namespace BlazeRecon {
     #define PROBE_MAX 32
 
     struct ProbeEntry {
+        uint32_t t;
         uint8_t  mac[6];
-        char     ssid[33];
+        uint16_t hits; // probe-request count for this MAC+SSID (saturated)
         uint8_t  ch;
         int8_t   rssi;
-        uint32_t t;
+        char     ssid[33];
     };
 
     static ProbeEntry probe[PROBE_MAX];
@@ -179,6 +180,7 @@ namespace BlazeRecon {
             probe[slot].rssi = rssi;
             probe[slot].ch   = ch;
             probe[slot].t    = millis();
+            if (probe[slot].hits < 65535) probe[slot].hits++;
             return;
         }
 
@@ -195,6 +197,7 @@ namespace BlazeRecon {
         probe[slot].ch   = ch;
         probe[slot].rssi = rssi;
         probe[slot].t    = millis();
+        probe[slot].hits = 1;
     }
 
     // find LLC/SNAP + EAPOL ethertype in a sniffer buffer
@@ -341,6 +344,19 @@ namespace BlazeRecon {
         s += " ";
         s += String(probe[idx].rssi);
         return s;
+    }
+
+    bool probeGet(int i, ProbeInfo& out) {
+        if (i < 0 || i >= probeN) return false;
+
+        int idx = (probeNext + PROBE_MAX - 1 - i) % PROBE_MAX; // i = 0 -> newest
+        memcpy(out.mac, probe[idx].mac, 6);
+        memcpy(out.ssid, probe[idx].ssid, 33);
+        out.ch   = probe[idx].ch;
+        out.rssi = probe[idx].rssi;
+        out.t    = probe[idx].t;
+        out.hits = probe[idx].hits;
+        return true;
     }
 
     void clearProbes() {

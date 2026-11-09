@@ -8,6 +8,7 @@
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
 #include "BlazeBadUSB.h"
+#include "BlazeIntel.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeCfg.h"
 #include "BlazeChat.h"
@@ -919,6 +920,35 @@ void CLI::runCommand(String input) {
             else prntln(String(F("badusb: busy - wait for link/stop first")));
         } else {
             prntln(String(F("usage: badusb [normal|critical|stop|status]")));
+        }
+    }
+
+    // ===== PROBE INTELLIGENCE (Phase 9) =====
+    // intel [hidden|stop|pnl|victim|timeline|status]
+    else if (eqlsCMD(0, CLI_INTEL)) {
+        String sub = list->size() > 1 ? list->get(1) : String();
+        if (sub.equalsIgnoreCase("stop")) {
+            BlazeIntel::stopHidden();
+            prntln(String(F("intel: hidden scan stopped")));
+        } else if (sub.equalsIgnoreCase("hidden")) {
+            if (BlazeIntel::startHidden()) prntln(String(F("intel: hidden scan -> listen -> kick -> listen")));
+            else prntln(String(F("intel: air busy (stop attack/scan/twin/detector first)")));
+        } else if (sub.equalsIgnoreCase("pnl")) {
+            BlazeIntel::pnlBuild();
+            prntln(String(F("[PNL] ")) + String(BlazeIntel::pnlCount()) + String(F(" preferred network(s)")));
+            for (int i = 0; i < BlazeIntel::pnlCount(); i++) prntln(BlazeIntel::pnlLine(i));
+        } else if (sub.equalsIgnoreCase("victim")) {
+            BlazeIntel::victimBuild();
+            prntln(String(F("[VICTIM] ")) + String(BlazeIntel::victimCount()) + String(F(" client(s)")));
+            for (int i = 0; i < BlazeIntel::victimCount(); i++) prntln(BlazeIntel::victimLine(i));
+        } else if (sub.equalsIgnoreCase("timeline")) {
+            BlazeIntel::timelineBuild();
+            prntln(String(F("[TIMELINE] ")) + String(BlazeIntel::timelineCount()) + String(F(" probe(s)")));
+            for (int i = 0; i < BlazeIntel::timelineCount(); i++) prntln(BlazeIntel::timelineLine(i));
+        } else if (sub.length() == 0 || sub.equalsIgnoreCase("status")) {
+            prntln(BlazeIntel::reportJson());
+        } else {
+            prntln(String(F("usage: intel [hidden|stop|pnl|victim|timeline|status]")));
         }
     }
 

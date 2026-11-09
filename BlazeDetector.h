@@ -26,6 +26,13 @@
 #include <Arduino.h>
 
 namespace BlazeDetector {
+    // result view filters (Phase 9/10): the same measured findings, different lens
+    enum : uint8_t {
+        FILTER_ALL   = 0,
+        FILTER_DUEL  = 1,
+        FILTER_RIVAL = 2
+    };
+
     void setup();
     void update(); // cycle + confirm state machine (main loop)
 
@@ -33,10 +40,17 @@ namespace BlazeDetector {
     void sniff(uint8_t* buf, uint16_t len); // RAM-only accounting
 
     // ===== cycle ===== //
-    bool start();   // scan -> sniff -> analyze; false = refused (attack/scan/twin busy)
+    bool start(uint8_t filter = FILTER_ALL); // scan -> sniff -> analyze; false = refused
     void stop();    // abort cycle/confirm, release sniff (findings kept)
     bool running(); // cycle in progress?
     int  phase();   // 0 idle, 1 scanning, 2 sniffing, 3 analyzing, 4 confirming
+
+    // ===== result view filter ===== //
+    void     setFilter(uint8_t filter);
+    uint8_t  filter();
+    const char* filterName();      // "ALL" / "DUEL" / "RIVAL"
+    int      filteredCount();      // findings passing the current filter
+    int      filteredIndex(int i); // raw finding index for filtered row i (-1 invalid)
 
     // ===== active twin proof (directed probe -> responses) ===== //
     bool confirm(int idx); // finding idx must be type DUP; false = refused
