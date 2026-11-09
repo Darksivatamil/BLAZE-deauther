@@ -90,6 +90,7 @@ enum class DISPLAY_MODE { OFF,
                           DETECT,
                           PROBELOG,
                           VULN,
+                          BADUSB,
                           PANIC };
 
 class DisplayUI {
@@ -194,6 +195,7 @@ class DisplayUI {
         Menu attackMenu;
         Menu clockMenu;
         Menu weightMenu; // reaction weights editor (plan 3.2)
+        Menu badusbMenu; // BADUSB NORMAL / CRITICAL / EXIT
 
         Menu apListMenu;
         Menu stationListMenu;
@@ -236,6 +238,9 @@ class DisplayUI {
 
         // BLAZE detector (phase 7)
         void drawDetect();
+
+        // BLAZE BadUSB (phase 8)
+        void drawBadUsb();
 
         // BLAZE recon screens (plans 4.5 / 4.6)
         void drawProbeLog(); // live probe-request list

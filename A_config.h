@@ -68,6 +68,17 @@
 // ===== BLAZE MODE BUTTON ===== //
 #define BUTTON_MODE 0 // D3 (GPIO0) - REMOVED from UI (unused), only kept pulled up
 
+// ===== BLAZE BADUSB UPLINK (external Pico) ===== //
+// ESP8266 has no USB device peripheral; a Pico/Digispark does the HID typing.
+// TX is fixed to UART1 GPIO2 (D4). ACK input must be GPIO16 (D0) because it
+// is the only free pin that is boot-safe on the NodeMCU.
+#ifndef BADUSB_TX_PIN
+  #define BADUSB_TX_PIN 2   // D4 / GPIO2 = UART1 TX -> Pico GP1
+#endif
+#ifndef BADUSB_ACK_PIN
+  #define BADUSB_ACK_PIN 16 // D0 / GPIO16 = presence/ACK input <- Pico GP2
+#endif
+
 // ===== BLAZE COMPANION (offline only) ===== //
 // no AI uplink — text-only persona (see UPGRADE_PLAN.md)
 #define BLAZE_HOME_SSID "" // home/owned network - protected by OwnNetGuard + IntruderAlert

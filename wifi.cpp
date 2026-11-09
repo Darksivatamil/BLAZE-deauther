@@ -26,6 +26,7 @@ extern "C" {
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
+#include "BlazeBadUSB.h"
 #include "src/ArduinoJson-v5.13.5/ArduinoJson.h"
 
 extern DisplayUI displayUI;
@@ -505,6 +506,32 @@ namespace wifi {
 
         server.on("/detect.json", HTTP_GET, []() {
             server.send(200, str(W_JSON), BlazeDetector::reportJson());
+        });
+
+        // ===== BADUSB (Phase 8) =====
+        server.on("/badusb", HTTP_GET, []() {
+            String cmd = server.arg("cmd");
+            String mode = server.arg("mode");
+            String json;
+            if (cmd == "stop") {
+                BlazeBadUSB::stop();
+                json = "{\"ok\":true}";
+            } else if (cmd == "ping") {
+                BlazeBadUSB::probe();
+                json = "{\"ok\":true}";
+            } else if (cmd == "start") {
+                BlazeBadUSB::Mode m = (mode == "critical") ? BlazeBadUSB::MODE_CRITICAL
+                                                           : BlazeBadUSB::MODE_NORMAL;
+                bool ok = BlazeBadUSB::start(m);
+                json = ok ? "{\"ok\":true}" : "{\"ok\":false}";
+            } else {
+                json = "{\"ok\":true}";
+            }
+            server.send(200, str(W_JSON), json);
+        });
+
+        server.on("/badusb.json", HTTP_GET, []() {
+            server.send(200, str(W_JSON), BlazeBadUSB::reportJson());
         });
 
         server.on("/blaze/loginfail", HTTP_POST, []() {

@@ -7,6 +7,7 @@
 #include "wifi.h"
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
+#include "BlazeBadUSB.h"
 #include "BlazeEvilTwin.h"
 #include "BlazeCfg.h"
 #include "BlazeChat.h"
@@ -896,6 +897,28 @@ void CLI::runCommand(String input) {
             else prntln(String(F("detector: air busy (stop attack/scan/twin first)")));
         } else {
             prntln(String(F("usage: detect [start|stop|status|clear|confirm <idx>]")));
+        }
+    }
+
+    // ===== BADUSB (Phase 8) =====
+    // badusb [normal/critical/stop/status]
+    else if (eqlsCMD(0, CLI_BADUSB)) {
+        String sub = list->size() > 1 ? list->get(1) : String();
+        if (sub.equalsIgnoreCase("stop")) {
+            BlazeBadUSB::stop();
+            prntln(String(F("badusb: stop sent")));
+        } else if (sub.equalsIgnoreCase("status")) {
+            prntln(BlazeBadUSB::reportJson());
+        } else if (sub.equalsIgnoreCase("critical")) {
+            if (BlazeBadUSB::start(BlazeBadUSB::MODE_CRITICAL))
+                prntln(String(F("badusb: CRITICAL sent (await ACK)")));
+            else prntln(String(F("badusb: busy - wait for link/stop first")));
+        } else if (sub.length() == 0 || sub.equalsIgnoreCase("normal")) {
+            if (BlazeBadUSB::start(BlazeBadUSB::MODE_NORMAL))
+                prntln(String(F("badusb: NORMAL sent (await ACK)")));
+            else prntln(String(F("badusb: busy - wait for link/stop first")));
+        } else {
+            prntln(String(F("usage: badusb [normal|critical|stop|status]")));
         }
     }
 

@@ -10,6 +10,7 @@
 #include "BlazeEvilTwin.h"
 #include "BlazeRecon.h"
 #include "BlazeDetector.h"
+#include "BlazeBadUSB.h"
 
 // ===== adjustable ===== //
 void DisplayUI::configInit() {
@@ -120,6 +121,7 @@ void DisplayUI::setup() {
                 flashMsg(String(F("air busy.")), 1500);
             }
         });
+        addMenuNode(&mainMenu, []() { return String("BADUSB"); }, &badusbMenu); // external Pico HID
         addMenuNode(&mainMenu, []() { return String("TRACKER"); }, [this]() { // pick target -> track
             startTracker(-1);
         });
@@ -612,6 +614,37 @@ void DisplayUI::setup() {
         });
     });
 
+    // BADUSB MENU (Phase 8): select a payload; SELECT again on the run screen stops it
+    createMenu(&badusbMenu, &mainMenu, [this]() {
+        addMenuNode(&badusbMenu, [this]() {
+            return leftRight("NORMAL", BlazeBadUSB::statusName(), maxLen - 1);
+        }, [this]() {
+            if (BlazeBadUSB::start(BlazeBadUSB::MODE_NORMAL)) {
+                mode = DISPLAY_MODE::BADUSB;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                flashMsg(String(F("duck busy.")), 1500);
+            }
+        });
+        addMenuNode(&badusbMenu, [this]() {
+            return leftRight("CRITICAL", BlazeBadUSB::statusName(), maxLen - 1);
+        }, [this]() {
+            if (BlazeBadUSB::start(BlazeBadUSB::MODE_CRITICAL)) {
+                mode = DISPLAY_MODE::BADUSB;
+                restoreMenuFont();
+                buttonTime = currentTime;
+            } else {
+                flashMsg(String(F("duck busy.")), 1500);
+            }
+        });
+        addMenuNode(&badusbMenu, []() { return String("EXIT"); }, [this]() {
+            BlazeBadUSB::stop();
+            goBack();
+        });
+        BlazeBadUSB::probe(); // refresh the link label without blocking
+    });
+
     // CLOCK MENU
     createMenu(&clockMenu, &mainMenu, [this]() {
         addMenuNode(&clockMenu, D_CLOCK_DISPLAY, [this]() { // CLOCK
@@ -683,6 +716,7 @@ void DisplayUI::update(bool force) {
         mode == DISPLAY_MODE::TRACKER ||
         mode == DISPLAY_MODE::EVILTWIN ||
         mode == DISPLAY_MODE::DETECT ||
+        mode == DISPLAY_MODE::BADUSB ||
         mode == DISPLAY_MODE::PANIC) {
         buttonTime = currentTime;
         return;
@@ -964,6 +998,15 @@ void DisplayUI::setupButtons() {
                 buttonTime = currentTime;
                 break;
 
+            // BADUSB: re-click SELECT stops the payload and returns to its menu
+            case DISPLAY_MODE::BADUSB:
+                BlazeBadUSB::stop();
+                mode = DISPLAY_MODE::MENU;
+                changeMenu(&badusbMenu);
+                restoreMenuFont();
+                buttonTime = currentTime;
+                break;
+
             // recon screens: SELECT = back to menu
             case DISPLAY_MODE::PROBELOG:
                 if (probeLogSniff && scan.isSniffing()) scan.stop();
@@ -1045,6 +1088,13 @@ void DisplayUI::setupButtons() {
             case DISPLAY_MODE::DETECT:
                 BlazeDetector::stop();
                 mode = DISPLAY_MODE::MENU;
+                restoreMenuFont();
+                break;
+
+            case DISPLAY_MODE::BADUSB:
+                BlazeBadUSB::stop();
+                mode = DISPLAY_MODE::MENU;
+                changeMenu(&badusbMenu);
                 restoreMenuFont();
                 break;
 
@@ -1151,6 +1201,7 @@ void DisplayUI::panicStop() {
     BlazeTracker::stop();
     BlazeEvilTwin::stop();
     BlazeDetector::stop();
+    BlazeBadUSB::stop();
     kickLureActive = false;
     prntln("PANIC: all attacks stopped");
 
@@ -1323,6 +1374,9 @@ void DisplayUI::draw(bool force) {
                 break;
             case DISPLAY_MODE::DETECT:
                 drawDetect();
+                break;
+            case DISPLAY_MODE::BADUSB:
+                drawBadUsb();
                 break;
             case DISPLAY_MODE::PROBELOG:
                 drawProbeLog();
@@ -1591,6 +1645,31 @@ void DisplayUI::drawDetect() {
     drawString(3, detail);
 
     drawString(4, center("UP/DN B=back", maxLen));
+}
+
+// ===== BLAZE: BADUSB - external Pico HID link ===== //
+void DisplayUI::drawBadUsb() {
+    restoreMenuFont();
+
+    drawString(0, leftRight(String(F("BADUSB ")) + String(BlazeBadUSB::modeName()),
+                            String(BlazeBadUSB::statusName()), maxLen - 1));
+
+    if (BlazeBadUSB::awaitingAck()) {
+        drawString(1, center("waiting for duck", maxLen));
+        drawString(2, center("ACK 400ms", maxLen));
+    } else if (BlazeBadUSB::running()) {
+        drawString(1, center("payload running", maxLen));
+        drawString(2, center("duck is typing", maxLen));
+    } else if (BlazeBadUSB::linked()) {
+        drawString(1, center("duck ready", maxLen));
+        drawString(2, center("no active payload", maxLen));
+    } else {
+        drawString(1, center("no duck.", maxLen));
+        drawString(2, center("check D4/D0/GND", maxLen));
+    }
+
+    drawString(3, String(F("sent ")) + String(BlazeBadUSB::sentCount()));
+    drawString(4, center("SELECT = STOP", maxLen));
 }
 
 // ===== BLAZE: probe-request log screen (plan 4.5) ===== //
